@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Editor — Resume the CV{% endblock %}
+
+{% macro bullet_row(b) -%}
+<div class="bullet-row">
+  <span class="drag">•</span>
+  <input type="hidden" data-f="id" value="{{ b.id }}">
+  <textarea data-f="text" rows="1" placeholder="Achievement bullet…">{{ b.text }}</textarea>
+  <button type="button" class="btn-ghost rm-bullet" title="Remove bullet">✕</button>
+</div>
+{%- endmacro %}
+
+{% macro link_row(l) -%}
+<div class="bullet-row link-row">
+  <input type="text" data-f="label" value="{{ l.label }}" placeholder="Label (e.g. GitHub)" style="max-width:160px">
+  <input type="text" data-f="url" value="{{ l.url }}" placeholder="URL">
+  <button type="button" class="btn-ghost rm-row" title="Remove link">✕</button>
+</div>
+{%- endmacro %}
+
+{% macro exp_entry(e) -%}
+<div class="entry">
+  <div class="entry-head"><button type="button" class="btn-ghost rm-entry">✕ remove role</button></div>
+  <div class="row">
+    <label>Job title<input type="text" data-f="title" value="{{ e.title }}"></label>
+    <label>Company<input type="text" data-f="company" value="{{ e.company }}"></label>
+  </div>
+  <div class="row">
+    <label>Location<input type="text" data-f="location" value="{{ e.location }}"></label>
+    <label>Start<input type="text" data-f="start" value="{{ e.start }}" placeholder="YYYY-MM"></label>
+    <label>End<input type="text" data-f="end" value="{{ e.end or '' }}" placeholder="YYYY-MM (empty = Present)"></label>
+  </div>
+  <div class="bullets">{% for b in e.bullets %}{{ bullet_row(b) }}{% endfor %}</div>
+  <button type="button" class="btn btn-sm add-bullet">+ bullet</button>
+</div>
+{%- endmacro %}
+
+{% macro edu_entry(e) -%}
+<div class="entry">
+  <div class="entry-head"><button type="button" class="btn-ghost rm-entry">✕ remove</button></div>
+  <div class="row">
+    <label>Degree<input type="text" data-f="degree" value="{{ e.degree }}"></label>
+    <label>Institution<input type="text" data-f="institution" value="{{ e.institution }}"></label>
+  </div>
+  <div class="row">
+    <label>Start<input type="text" data-f="start" value="{{ e.start }}" placeholder="YYYY-MM"></label>
+    <label>End<input type="text" data-f="end" value="{{ e.end or '' }}" placeholder="YYYY-MM"></label>
+    <label>Details<input type="text" data-f="details" value="{{ e.details }}" placeholder="Honors, GPA…"></label>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro skill_entry(s) -%}
+<div class="entry">
+  <div class="row" style="align-items:flex-end">
+    <label style="max-width:180px">Group<input type="text" data-f="group" value="{{ s.group }}" placeholder="e.g. Languages"></label>
+    <label>Items (comma-separated)<input type="text" data-f="items" value="{{ s['items'] | join(', ') }}"></label>
+    <button type="button" class="btn-ghost rm-entry" title="Remove group">✕</button>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro proj_entry(p) -%}
+<div class="entry">
+  <div class="entry-head"><button type="button" class="btn-ghost rm-entry">✕ remove project</button></div>
+  <div class="row">
+    <label>Name<input type="text" data-f="name" value="{{ p.name }}"></label>
+    <label>URL<input type="text" data-f="url" value="{{ p.url }}"></label>
+  </div>
+  <div class="bullets">{% for b in p.bullets %}{{ bullet_row(b) }}{% endfor %}</div>
+  <button type="button" class="btn btn-sm add-bullet">+ bullet</button>
+</div>
+{%- endmacro %}
+
+{% macro cert_entry(c) -%}
+<div class="entry">
+  <div class="row" style="align-items:flex-end">
+    <label>Name<input type="text" data-f="name" value="{{ c.name }}"></label>
+    <label style="max-width:200px">Issuer<input type="text" data-f="issuer" value="{{ c.issuer }}"></label>
+    <label style="max-width:120px">Date<input type="text" data-f="date" value="{{ c.date }}" placeholder="YYYY-MM"></label>
+    <button type="button" class="btn-ghost rm-entry" title="Remove">✕</button>
+  </div>
+</div>
+{%- endmacro %}
+
+{% block content %}
+<div class="editor-grid">
+  <div class="pane" id="form-pane">
+    <div class="pane-head">
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="form">Form</button>
+        <button type="button" class="tab" data-tab="yaml">YAML</button>
+      </div>
+      <span class="nav-spacer" style="flex:1"></span>
+      <span id="save-status" class="nav-status"></span>
+      <button type="button" class="btn btn-primary" id="save-btn">Save</button>
+    </div>
+
+    <div class="pane-body" id="tab-form">
+      <fieldset class="section" id="sec-basics">
+        <legend>Basics</legend>
+        <div class="row">
+          <label>Name<input type="text" data-f="name" value="{{ cv.basics.name }}"></label>
+          <label>Title / headline<input type="text" data-f="title" value="{{ cv.basics.title }}"></label>
+        </div>
+        <div class="row">
+          <label>Email<input type="text" data-f="email" value="{{ cv.basics.email }}"></label>
+          <label>Phone<input type="text" data-f="phone" value="{{ cv.basics.phone }}"></label>
+          <label>Location<input type="text" data-f="location" value="{{ cv.basics.location }}"></label>
+        </div>
+        <div id="links-list">{% for l in cv.basics.links %}{{ link_row(l) }}{% endfor %}</div>
+        <button type="button" class="btn btn-sm" id="add-link">+ link</button>
+      </fieldset>
+
+      <fieldset class="section" id="sec-summary">
+        <legend>Summary</legend>
+        <textarea data-f="summary" rows="4" placeholder="2–3 sentence professional summary…">{{ cv.summary }}</textarea>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Experience</legend>
+        <div id="exp-list">{% for e in cv.experience %}{{ exp_entry(e) }}{% endfor %}</div>
+        <button type="button" class="btn btn-add" data-add="exp">+ add role</button>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Education</legend>
+        <div id="edu-list">{% for e in cv.education %}{{ edu_entry(e) }}{% endfor %}</div>
+        <button type="button" class="btn btn-add" data-add="edu">+ add education</button>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Skills</legend>
+        <div id="skill-list">{% for s in cv.skills %}{{ skill_entry(s) }}{% endfor %}</div>
+        <button type="button" class="btn btn-add" data-add="skill">+ add skill group</button>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Projects</legend>
+        <div id="proj-list">{% for p in cv.projects %}{{ proj_entry(p) }}{% endfor %}</div>
+        <button type="button" class="btn btn-add" data-add="proj">+ add project</button>
+      </fieldset>
+
+      <fieldset class="section">
+        <legend>Certifications</legend>
+        <div id="cert-list">{% for c in cv.certifications %}{{ cert_entry(c) }}{% endfor %}</div>
+        <button type="button" class="btn btn-add" data-add="cert">+ add certification</button>
+      </fieldset>
+    </div>
+
+    <div class="pane-body" id="tab-yaml" hidden>
+      <p class="dropnote">Direct YAML editing. Saving here replaces the whole CV; the form tab reloads afterwards.</p>
+      <textarea class="yaml" id="yaml-text" spellcheck="false">{{ cv_yaml }}</textarea>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div class="pane-head">
+      <strong>Preview</strong>
+      <span class="nav-spacer" style="flex:1"></span>
+      <a class="btn btn-sm" href="/out/cv.pdf" target="_blank" id="pdf-link">PDF ↗</a>
+      <a class="btn btn-sm" href="/out/cv.txt" target="_blank" id="txt-link">ATS .txt ↗</a>
+    </div>
+    {% if typst_ok %}
+      <iframe class="preview-frame" id="preview" title="PDF preview"></iframe>
+    {% else %}
+      <div class="preview-empty">PDF preview disabled — typst binary not found.<br>
+        Drop it in <code>tools/typst</code> or <code>brew install typst</code>, then restart.</div>
+    {% endif %}
+  </div>
+</div>
+
+<template id="tpl-bullet">{{ bullet_row({'id': '', 'text': ''}) }}</template>
+<template id="tpl-link">{{ link_row({'label': '', 'url': ''}) }}</template>
+<template id="tpl-exp">{{ exp_entry({'title':'','company':'','location':'','start':'','end':'','bullets':[]}) }}</template>
+<template id="tpl-edu">{{ edu_entry({'degree':'','institution':'','start':'','end':'','details':''}) }}</template>
+<template id="tpl-skill">{{ skill_entry({'group':'','items':[]}) }}</template>
+<template id="tpl-proj">{{ proj_entry({'name':'','url':'','bullets':[]}) }}</template>
+<template id="tpl-cert">{{ cert_entry({'name':'','issuer':'','date':''}) }}</template>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/editor.js"></script>
+{% endblock %}

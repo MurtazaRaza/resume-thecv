@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Resume the CV{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+</head>
+<body>
+  <nav class="topnav">
+    <span class="brand">Resume the CV</span>
+    <a href="/editor" {% if request.url.path == '/editor' %}class="active"{% endif %}>Editor</a>
+    <a href="/import" {% if request.url.path == '/import' %}class="active"{% endif %}>Import</a>
+    <span class="nav-spacer"></span>
+    <span class="nav-status" title="Local LLM model">{{ model }}</span>
+    {% if not typst_ok %}
+      <span class="nav-warn" title="PDF rendering disabled. Put the typst binary in tools/ or brew install typst.">⚠ typst missing</span>
+    {% endif %}
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <div id="toast" class="toast" hidden></div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

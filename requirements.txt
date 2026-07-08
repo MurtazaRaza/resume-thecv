@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+jinja2
+httpx
+pyyaml
+python-multipart
+pypdf
+python-docx

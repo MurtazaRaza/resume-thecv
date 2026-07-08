@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Import — Resume the CV{% endblock %}
+
+{% block content %}
+<div class="import-wrap">
+  <div class="pane">
+    <div class="pane-head"><strong>Import your resume</strong></div>
+    <div class="pane-body">
+      <p class="dropnote">
+        Upload a PDF/DOCX or paste plain text (a LinkedIn profile copy-paste works too).
+        The local model ({{ model }}) converts it section by section — you review and fix
+        the result in the editor. On this machine expect roughly 30–90 seconds.
+      </p>
+
+      {% if not ollama_ok %}
+      <div class="warnbox">⚠ Ollama doesn't seem to be running at its configured URL.
+        Start it with <code>ollama serve</code> (or open the Ollama app), then retry.</div>
+      {% endif %}
+
+      {% if not cv_empty %}
+      <div class="warnbox">⚠ You already have a CV. Importing <strong>replaces</strong> it —
+        the current one is backed up to <code>data/versions/pre-import-…yaml</code> first.</div>
+      {% endif %}
+
+      <form id="import-form">
+        <label>Resume file (.pdf / .docx / .txt)
+          <input type="file" name="file" accept=".pdf,.docx,.txt">
+        </label>
+        <p class="dropnote" style="text-align:center; margin:10px 0">— or —</p>
+        <label>Paste resume text
+          <textarea name="pasted" rows="12" placeholder="Paste your full resume text here…"></textarea>
+        </label>
+        <div style="margin-top:14px; display:flex; gap:10px; align-items:center">
+          <button type="submit" class="btn btn-primary" id="import-btn">Import</button>
+          <span id="import-status" class="dropnote"></span>
+        </div>
+      </form>
+
+      <div id="import-warnings" class="warnbox" hidden></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById("import-form");
+  const btn = document.getElementById("import-btn");
+  const status = document.getElementById("import-status");
+  const warnings = document.getElementById("import-warnings");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Importing…';
+    status.textContent = "Running local model, section by section…";
+    warnings.hidden = true;
+    try {
+      const resp = await fetch("/api/import", { method: "POST", body: new FormData(form) });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || resp.statusText);
+      if (data.warnings && data.warnings.length) {
+        warnings.hidden = false;
+        warnings.innerHTML = "⚠ Some sections could not be parsed and were skipped:<br>" +
+          data.warnings.map((w) => "• " + w).join("<br>") +
+          "<br>Redirecting to the editor in 6s — add them manually there.";
+        setTimeout(() => { location.href = data.redirect; }, 6000);
+      } else {
+        location.href = data.redirect;
+      }
+    } catch (err) {
+      status.textContent = "";
+      warnings.hidden = false;
+      warnings.textContent = "Import failed: " + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Import";
+    }
+  });
+})();
+</script>
+{% endblock %}
