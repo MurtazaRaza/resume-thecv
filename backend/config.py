@@ -4,7 +4,10 @@ import os
 import shutil
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 # --- directories -----------------------------------------------------------
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
@@ -19,13 +22,31 @@ OUT_DIR = DATA_DIR / "out"
 TRACKER_DB = DATA_DIR / "tracker.db"
 
 # --- LLM -------------------------------------------------------------------
-LLM_PROVIDER = os.environ.get("CVE_PROVIDER", "ollama")  # ollama | anthropic
+LLM_PROVIDER = os.environ.get("CVE_PROVIDER", "ollama")  # ollama | anthropic | gemini
 OLLAMA_URL = os.environ.get("CVE_OLLAMA_URL", "http://localhost:11434")
 # qwen2.5:3b-instruct: best JSON/instruction-following in the 3-4B class that
 # fits 8 GB RAM (~1.9 GB quantized). Override with CVE_MODEL.
 MODEL = os.environ.get("CVE_MODEL", "qwen2.5:3b-instruct")
 NUM_CTX = 4096
 LLM_TIMEOUT_S = 120
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("CVE_GEMINI_MODEL", "gemini-2.5-flash")
+
+# Per-task model overrides, keyed by the task name each get_provider(task=...)
+# call site passes (see backend/main.py). Empty by default — every task uses
+# the active provider's default MODEL/GEMINI_MODEL. Set an override to route a
+# specific task to a stronger/cheaper model without touching call sites, e.g.
+#   CVE_TASK_MODEL_tailor_suggest=gemini-2.5-pro
+# The env var suffix must match the task name passed to get_provider().
+TASK_MODELS = {
+    task: model
+    for task in (
+        "import", "bullet_optimize", "grammar", "letters", "jd_extract",
+        "tailor_suggest", "summary", "headline",
+    )
+    if (model := os.environ.get(f"CVE_TASK_MODEL_{task}", "").strip())
+}
 
 # --- rendering -------------------------------------------------------------
 def find_typst() -> "str | None":

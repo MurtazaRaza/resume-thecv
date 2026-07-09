@@ -37,6 +37,14 @@ def page_ctx(request: Request, **extra):
             "model": config.MODEL, **extra}
 
 
+def _provider_up() -> bool:
+    """Health check for the active provider; Anthropic stub is always "ok"
+    since it has nothing to probe yet."""
+    if config.LLM_PROVIDER in ("ollama", "gemini"):
+        return get_provider().is_up()
+    return True
+
+
 # --- pages -------------------------------------------------------------------
 
 @app.get("/")
@@ -60,7 +68,7 @@ def import_page(request: Request):
     cv = cv_model.load_cv()
     return templates.TemplateResponse("import.html", page_ctx(
         request, cv_empty=cv_model.cv_is_empty(cv),
-        ollama_ok=get_provider().is_up() if config.LLM_PROVIDER == "ollama" else True))
+        ollama_ok=_provider_up()))
 
 
 # --- CV load/save --------------------------------------------------------------
@@ -152,7 +160,7 @@ async def grammar_pass(request: Request):
     if not text.strip():
         return {"issues": [], "empty": True}
     try:
-        return {"issues": optimizer.grammar_check(text, get_provider())}
+        return {"issues": optimizer.grammar_check(text, get_provider("grammar"))}
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
@@ -164,7 +172,7 @@ async def optimize_bullet(request: Request):
     if not text:
         return JSONResponse({"error": "Empty bullet"}, status_code=422)
     try:
-        return optimizer.optimize(text, get_provider())
+        return optimizer.optimize(text, get_provider("bullet_optimize"))
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
@@ -179,7 +187,7 @@ async def summary_generate(request: Request):
     cv = cv_model.normalize(data.get("cv") or cv_model.load_cv())
     try:
         return summary.generate_summaries(
-            cv, get_provider(), target_title=str(data.get("target_title") or ""))
+            cv, get_provider("summary"), target_title=str(data.get("target_title") or ""))
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
@@ -191,7 +199,7 @@ async def headline_generate(request: Request):
     cv = cv_model.normalize(data.get("cv") or cv_model.load_cv())
     try:
         return summary.generate_headlines(
-            cv, get_provider(), target_title=str(data.get("target_title") or ""))
+            cv, get_provider("headline"), target_title=str(data.get("target_title") or ""))
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
@@ -206,7 +214,7 @@ def tailor_page(request: Request):
         applications=tracker.list_applications(),
         skill_groups=[g["group"] for g in cv["skills"] if g["group"]],
         current_title=cv["basics"]["title"],
-        ollama_ok=get_provider().is_up() if config.LLM_PROVIDER == "ollama" else True))
+        ollama_ok=_provider_up()))
 
 
 def _tailoring_context(app_id):
@@ -279,7 +287,7 @@ async def tailor_extract(request: Request):
         app_id = tracker.create_application(company, role,
                                             (data.get("url") or "").strip())
     try:
-        extraction = tailor.extract(jd_text, get_provider())
+        extraction = tailor.extract(jd_text, get_provider("jd_extract"))
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
     tracker.update_application(app_id, jd_text=jd_text,
@@ -298,7 +306,7 @@ async def tailor_suggest(request: Request):
     if err:
         return err
     return tailor.suggest(cv_model.load_cv(), extraction,
-                          entry["jd_text"] or "", get_provider(),
+                          entry["jd_text"] or "", get_provider("tailor_suggest"),
                           guidance=str(data.get("guidance") or ""))
 
 
@@ -333,7 +341,7 @@ def letters_new_page(request: Request):
             if (tracker.get_application(a["id"]) or {}).get("jd_extraction")]
     return templates.TemplateResponse("letters.html", page_ctx(
         request, cv_empty=cv_model.cv_is_empty(cv), applications=apps,
-        ollama_ok=get_provider().is_up() if config.LLM_PROVIDER == "ollama" else True))
+        ollama_ok=_provider_up()))
 
 
 @app.post("/api/letters/generate")
@@ -345,7 +353,7 @@ async def letters_generate(request: Request):
     cv = cv_model.load_cv()
     try:
         result = cover_letter.generate(
-            cv, extraction, entry["company"], entry["role"], get_provider(),
+            cv, extraction, entry["company"], entry["role"], get_provider("letters"),
             tone=str(data.get("tone") or "professional"),
             emphasize=str(data.get("emphasize") or ""))
     except LLMError as e:
@@ -483,7 +491,7 @@ async def import_cv(file: UploadFile = File(None), pasted: str = Form("")):
         return JSONResponse({"error": "Nothing to import — upload a file or "
                                       "paste your resume text."}, status_code=422)
     try:
-        parsed = importer.parse_resume(text, get_provider())
+        parsed = importer.parse_resume(text, get_provider("import"))
     except LLMError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 

@@ -6,3 +6,4 @@ pyyaml
 python-multipart
 pypdf
 python-docx
+python-dotenv

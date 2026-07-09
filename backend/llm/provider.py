@@ -42,9 +42,16 @@ class AnthropicProvider(LLMProvider):
             "AnthropicProvider is a placeholder — set CVE_PROVIDER=ollama.")
 
 
-def get_provider() -> LLMProvider:
+def get_provider(task: str = "") -> LLMProvider:
+    """Build the active provider. `task` is an optional call-site name (e.g.
+    "tailor_suggest") used to look up a per-task model override in
+    config.TASK_MODELS — everything else about the provider stays the same."""
     from backend import config
+    model = config.TASK_MODELS.get(task) if task else None
+    if config.LLM_PROVIDER == "gemini":
+        from backend.llm.gemini import GeminiProvider
+        return GeminiProvider(model=model)
     if config.LLM_PROVIDER == "anthropic":
         return AnthropicProvider()
     from backend.llm.ollama import OllamaProvider
-    return OllamaProvider()
+    return OllamaProvider(model=model)
