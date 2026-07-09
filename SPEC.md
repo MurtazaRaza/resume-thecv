@@ -354,7 +354,7 @@ Preview: editor's right pane shows the compiled PDF in an `<embed>`, refreshed o
 
 ## 8. HTTP API (internal, consumed by htmx)
 
-Status: ✅ = implemented (M1–M2). Others are planned for their milestone.
+Status: ✅ = implemented (M1–M3). Others are planned for their milestone.
 
 | Route | Method | Purpose |
 |---|---|---|
@@ -370,9 +370,12 @@ Status: ✅ = implemented (M1–M2). Others are planned for their milestone.
 | `/api/analyze` | POST | ✅ Rules engine on posted CV state → findings |
 | `/api/analyze/grammar` | POST | ✅ LLM grammar pass for one section |
 | `/api/bullets/optimize` | POST | ✅ Checks + rewrite candidates for a posted bullet |
-| `/api/tailor/extract` | POST | JD → extraction JSON (cached on tracker entry) |
-| `/api/tailor/suggest` | POST | Missing-keyword bullet suggestions |
-| `/api/tailor/apply` | POST | Accepted changes → version snapshot |
+| `/tailor` | GET | ✅ Job tailoring page (JD → match report → suggestions → snapshot) |
+| `/api/tailor/application/{id}` | GET | ✅ Reload a saved application's cached JD + match (dropdown auto-reload) |
+| `/api/tailor/extract` | POST | ✅ JD → extraction JSON (cached on tracker entry) |
+| `/api/tailor/suggest` | POST | ✅ Missing-keyword bullet suggestions (optional user guidance) |
+| `/api/tailor/preview` | POST | ✅ Tailored CV → YAML for the live side-by-side preview |
+| `/api/tailor/apply` | POST | ✅ Accepted changes → version snapshot |
 | `/api/summary/generate` | POST | 3 summary variants |
 | `/api/headline/generate` | POST | 3 title-line options |
 | `/api/import` | POST | PDF/DOCX/text upload → parsed YAML for review |
@@ -401,9 +404,22 @@ Each milestone ends runnable and independently useful.
   LLM call (3B models skip the scaffold in a combined prompt). On-demand LLM grammar
   pass per section returning quote/issue/fix. Suggestions are apply-or-ignore; never
   auto-applied.
-- **M3 — Job Tailoring**
-  JD extraction, keyword matching + match score, skills-gap confirmation flow,
-  per-bullet suggestion flow, version snapshots.
+- **M3 — Job Tailoring** ✅ DONE
+  `/tailor` page (`tailor.py`): JD extraction (one LLM call, requirement-section
+  truncation for long JDs), deterministic keyword matching with plural/separator
+  tolerance → coverage % match score (hard skills + keywords; soft skills shown
+  but not scored), skills-gap "do you actually have these?" checkboxes, title
+  swap offer, per-bullet rewrite suggestions (word-overlap candidate picking via
+  JD context lines, ≤ 10 sequential calls, null escape hatch, accept/reject
+  cards), tailored snapshots to `data/versions/` linked to a tracker entry with
+  before/after coverage stored as `match_score`. Minimal tracker DAO
+  (list/create/get/update) added ahead of M5.
+  Live side-by-side preview: the tailored CV rendered as YAML (server-side via
+  `apply_tailoring` + `dump_yaml`, so it is byte-identical to what a save writes),
+  refreshed on every title-swap / accept / gap-skill toggle. Picking a saved
+  application from the dropdown reloads its cached JD + match report with no LLM
+  call. Optional free-text guidance steers rewrite tone (style only — honesty
+  rules still win).
 - **M4 — Summary + Cover Letters**
   Digest computation, summary variants, headline generator, letter pipeline +
   letter.typ export.

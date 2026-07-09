@@ -131,6 +131,70 @@ Managed a team of engineers to ship the mobile app
 Example output:
 {"metric_variant": "Managed a team of [N] engineers to ship the mobile app"}"""
 
+# --- §5.1 job tailoring ---------------------------------------------------------
+
+JD_EXTRACT = """You extract structured data from job descriptions.
+Respond with ONLY valid JSON matching:
+{"target_title": str, "hard_skills": [str], "soft_skills": [str],
+ "keywords": [str], "action_verbs": [str], "must_have_qualifications": [str]}
+hard_skills = technologies, tools, languages, and methods explicitly named.
+soft_skills = interpersonal/work-style traits explicitly asked for.
+keywords = other domain terms an ATS would match (not already in hard_skills).
+action_verbs = verbs the JD uses for the work itself (build, own, design…).
+must_have_qualifications = short paraphrases of explicit requirements.
+Max 15 items per list; [] when nothing fits. Copy terms as written in the JD.
+Never add skills or requirements the JD does not mention.
+
+Example input:
+Senior Backend Engineer. You will design Go microservices on Kubernetes and
+own our PostgreSQL data layer. Requirements: 5+ years backend experience,
+strong communication skills, CI/CD experience.
+Example output:
+{"target_title": "Senior Backend Engineer",
+ "hard_skills": ["Go", "Kubernetes", "PostgreSQL", "CI/CD"],
+ "soft_skills": ["communication"],
+ "keywords": ["microservices", "backend", "data layer"],
+ "action_verbs": ["design", "own"],
+ "must_have_qualifications": ["5+ years backend experience"]}"""
+
+TAILOR_REWRITE = """You rewrite one resume bullet so it naturally includes a
+keyword from a job description. Respond with ONLY valid JSON:
+{"rewrite": str or null}
+A rewrite is honest ONLY when the bullet already shows the same thing in
+other words: expanding an abbreviation (UE5 -> Unreal Engine 5), or using the
+keyword as the exact name/category of what the bullet already describes.
+Never invent facts, numbers, employers, technologies, versions, or experience
+the bullet does not show. A different version or tool is NOT the same thing:
+UE4 is not Unreal Engine 5, MySQL is not PostgreSQL. Keep every original
+fact. Max 30 words. When in doubt, "rewrite" MUST be null.
+The input may include "User guidance" describing tone or emphasis; follow it
+for style only. It NEVER permits inventing facts — if honesty and the guidance
+conflict, honesty wins and "rewrite" is null.
+
+Example input:
+Keyword: Unreal Engine 5
+Bullet: Designed a custom UE5 editor plugin in C++ to automate level checks
+Example output:
+{"rewrite": "Designed a custom Unreal Engine 5 editor plugin in C++ to automate level checks"}
+
+Example input:
+Keyword: Unreal Engine 5
+Bullet: Built an automated patching pipeline for our UE4 title using Jenkins
+Example output:
+{"rewrite": null}
+
+Example input:
+Keyword: data visualization
+Bullet: Built Grafana dashboards to monitor API latency across services
+Example output:
+{"rewrite": "Built Grafana dashboards for data visualization of API latency across services"}
+
+Example input:
+Keyword: multiplayer networking
+Bullet: Wrote unit tests for the payments API
+Example output:
+{"rewrite": null}"""
+
 # --- §5.4 LLM grammar pass ----------------------------------------------------
 
 GRAMMAR = """You proofread resume text. Report grammar, spelling, and punctuation

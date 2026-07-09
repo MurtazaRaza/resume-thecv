@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Tailor — Resume the CV{% endblock %}
+
+{% block content %}
+<div class="tailor-wrap">
+
+  {% if cv_empty %}
+  <div class="warnbox">⚠ Your CV is empty — <a href="/import">import it</a> first,
+    then come back to tailor it for a job.</div>
+  {% endif %}
+  {% if not ollama_ok %}
+  <div class="warnbox">⚠ Ollama doesn't seem to be running at its configured URL.
+    Start it with <code>ollama serve</code> (or open the Ollama app), then retry.</div>
+  {% endif %}
+
+  <div class="tailor-cols">
+  <div class="tailor-steps">
+
+  <!-- step 1: the job -->
+  <div class="pane">
+    <div class="pane-head"><strong>1 · Job description</strong></div>
+    <div class="pane-body">
+      <div class="row">
+        <label>Application
+          <select id="app-select">
+            <option value="">— new application —</option>
+            {% for a in applications %}
+            <option value="{{ a.id }}">{{ a.company }} — {{ a.role }} ({{ a.status }})</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="row" id="new-app-fields">
+        <label>Company<input type="text" id="jd-company" placeholder="Acme Corp"></label>
+        <label>Role<input type="text" id="jd-role" placeholder="Backend Engineer"></label>
+        <label>Job URL (optional)<input type="text" id="jd-url" placeholder="https://…"></label>
+      </div>
+      <label>Job description (paste the full text)
+        <textarea id="jd-text" rows="10" placeholder="Paste the job description here…"></textarea>
+      </label>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="extract-btn" {% if cv_empty %}disabled{% endif %}>Extract &amp; match</button>
+        <span id="extract-status" class="dropnote"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- step 2: match report + skills gap -->
+  <div class="pane" id="match-pane" hidden>
+    <div class="pane-head"><strong>2 · Match report</strong>
+      <span class="nav-spacer"></span>
+      <span class="score-badge" id="coverage-label"></span>
+    </div>
+    <div class="pane-body">
+      <div class="coverage-bar"><div class="coverage-fill" id="coverage-fill"></div></div>
+      <div id="title-swap-row" hidden>
+        <label class="checkline"><input type="checkbox" id="title-swap">
+          Swap my title to “<span id="target-title"></span>” (currently “<span id="current-title"></span>”)</label>
+      </div>
+      <h4 class="subhead">Covered keywords</h4>
+      <div class="chips" id="covered-chips"></div>
+      <h4 class="subhead">Missing keywords</h4>
+      <div class="chips" id="missing-chips"></div>
+      <div id="soft-line" class="dropnote"></div>
+      <div id="musthaves"></div>
+
+      <div id="gap-block" hidden>
+        <h4 class="subhead">Skills gap — do you actually have these?</h4>
+        <p class="dropnote">Checked skills are added to the tailored version's skills
+          section. Unchecked ones stay a visible gap — nothing is added silently.</p>
+        <div id="gap-list" class="gap-list"></div>
+        <label style="max-width:260px">Add checked skills to group
+          <select id="gap-group">
+            {% for g in skill_groups %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+            <option value="Skills" {% if not skill_groups %}selected{% endif %}>Skills (new group)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- step 3: bullet suggestions -->
+  <div class="pane" id="suggest-pane" hidden>
+    <div class="pane-head"><strong>3 · Bullet rewrite suggestions</strong></div>
+    <div class="pane-body">
+      <p class="dropnote">The local model tries to work missing keywords into related
+        bullets — only when truthful to the original. Accept the ones you like;
+        nothing is applied without your say-so.</p>
+      <label>Guidance for the model (optional)
+        <input type="text" id="suggest-guidance"
+          placeholder="e.g. emphasise leadership, keep it concise, prefer metrics">
+      </label>
+      <p class="dropnote">Steers tone and emphasis only — it never lets the model
+        invent experience.</p>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="suggest-btn">Suggest rewrites (LLM)</button>
+        <span id="suggest-status" class="dropnote"></span>
+      </div>
+      <div id="suggestions"></div>
+    </div>
+  </div>
+
+  <!-- step 4: save -->
+  <div class="pane" id="apply-pane" hidden>
+    <div class="pane-head"><strong>4 · Save tailored version</strong></div>
+    <div class="pane-body">
+      <p class="dropnote">Writes a snapshot to <code>data/versions/</code> linked to this
+        application. Your master CV is not changed.</p>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="apply-btn">Save tailored version</button>
+        <span id="apply-status" class="dropnote"></span>
+      </div>
+      <div id="apply-result" class="apply-result" hidden></div>
+    </div>
+  </div>
+
+  </div><!-- /.tailor-steps -->
+
+  <!-- live preview: the tailored CV as it would be saved -->
+  <div class="pane preview-pane" id="preview-pane" hidden>
+    <div class="pane-head"><strong>Live preview</strong>
+      <span class="nav-spacer" style="flex:1"></span>
+      <span id="preview-status" class="nav-status"></span>
+    </div>
+    <div class="pane-body">
+      <p class="dropnote">The tailored CV as it would be saved — updates as you
+        toggle the title swap, accept rewrites, or add gap skills. Your master
+        CV is untouched until you save.</p>
+      <textarea class="yaml" id="preview-yaml" spellcheck="false" readonly></textarea>
+    </div>
+  </div>
+
+  </div><!-- /.tailor-cols -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/tailor.js"></script>
+{% endblock %}
