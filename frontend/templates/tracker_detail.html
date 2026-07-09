@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ app.company }} — {{ app.role }} · Tracker{% endblock %}
+
+{% block content %}
+<div class="tracker-wrap detail-wrap" data-app-id="{{ app.id }}">
+
+  <div class="tracker-head">
+    <div>
+      <a href="/tracker" class="backlink">← All applications</a>
+      <h1>{{ app.company }} <span class="dropnote">·</span> {{ app.role }}</h1>
+      {% if app.url %}<a href="{{ app.url }}" target="_blank" rel="noopener" class="joburl">{{ app.url }}</a>{% endif %}
+    </div>
+    <div class="head-actions">
+      <label class="status-select-wrap">Status
+        <select id="status-select">
+          {% for s in statuses %}
+          <option value="{{ s }}" {% if s == app.status %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="button" class="btn btn-danger" id="delete-btn">Delete</button>
+    </div>
+  </div>
+
+  <div class="detail-cols">
+  <div class="detail-main">
+
+    <!-- match + JD -->
+    <div class="pane">
+      <div class="pane-head"><strong>Job &amp; match</strong>
+        <span class="nav-spacer" style="flex:1"></span>
+        {% if app.match_score is not none %}
+        <span class="match-pill {% if app.match_score >= 70 %}good{% elif app.match_score >= 40 %}mid{% else %}low{% endif %}">Match {{ app.match_score }}%</span>
+        {% endif %}
+        <a class="btn btn-sm btn-primary" href="/tailor?app={{ app.id }}" style="margin-left:8px">Tailor CV for this job →</a>
+      </div>
+      <div class="pane-body">
+        {% if extraction %}
+        <div class="chips">
+          {% if extraction.target_title %}<span class="chip">🎯 {{ extraction.target_title }}</span>{% endif %}
+          {% for s in extraction.hard_skills %}<span class="chip">{{ s }}</span>{% endfor %}
+        </div>
+        {% else %}
+        <p class="dropnote">No job description analyzed yet.
+          <a href="/tailor?app={{ app.id }}">Paste one on the Tailor page</a> to get a match score and requirements.</p>
+        {% endif %}
+        {% if app.jd_text %}
+        <details class="jd-details">
+          <summary>Job description text</summary>
+          <pre class="jd-text">{{ app.jd_text }}</pre>
+        </details>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- notes -->
+    <div class="pane">
+      <div class="pane-head"><strong>Notes</strong>
+        <span class="dropnote" style="margin-left:8px">interview notes, contacts, prep — Markdown</span>
+      </div>
+      <div class="pane-body">
+        <textarea id="notes" rows="10" spellcheck="true"
+          placeholder="Recruiter: …&#10;Interview 1 (date): …&#10;Questions to ask: …">{{ app.notes or "" }}</textarea>
+        <div class="actionbar">
+          <button type="button" class="btn btn-primary" id="save-notes">Save notes</button>
+          <span id="notes-status" class="dropnote"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- interview prep placeholder (M6) -->
+    <div class="pane">
+      <div class="pane-head"><strong>Interview prep kit</strong></div>
+      <div class="pane-body">
+        <p class="dropnote">Likely questions, STAR stories, and a personal pitch — coming in M6.
+          They generate from this application's analyzed job description.</p>
+      </div>
+    </div>
+
+  </div><!-- /.detail-main -->
+
+  <div class="detail-side">
+
+    <!-- next action -->
+    <div class="pane">
+      <div class="pane-head"><strong>Next action</strong></div>
+      <div class="pane-body">
+        <label>What<input type="text" id="next-action" value="{{ app.next_action or '' }}"
+          placeholder="e.g. follow up with recruiter"></label>
+        <label>When<input type="date" id="next-action-date" value="{{ app.next_action_date or '' }}"></label>
+        <div class="actionbar">
+          <button type="button" class="btn btn-primary" id="save-next">Save</button>
+          <span id="next-status" class="dropnote"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- artifacts -->
+    <div class="pane">
+      <div class="pane-head"><strong>Artifacts</strong></div>
+      <div class="pane-body artifacts-list">
+        {% if cv_version_url %}
+        <div class="artifact-item">📄 <a href="{{ cv_version_url }}" target="_blank" rel="noopener">Tailored CV</a>
+          <div class="dropnote">{{ app.cv_version_path }}</div></div>
+        {% else %}
+        <div class="dropnote">No tailored CV yet — <a href="/tailor?app={{ app.id }}">tailor one</a>.</div>
+        {% endif %}
+        {% if cover_letter_url %}
+        <div class="artifact-item">✉ <a href="{{ cover_letter_url }}" target="_blank" rel="noopener">Cover letter</a>
+          <div class="dropnote">{{ app.cover_letter_path }}</div></div>
+        {% else %}
+        <div class="dropnote">No cover letter yet — <a href="/letters/new">write one</a>.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- status history -->
+    <div class="pane">
+      <div class="pane-head"><strong>Status history</strong></div>
+      <div class="pane-body">
+        <ol class="history-list" id="history-list">
+          {% for h in history %}
+          <li><span class="status-dot status-{{ h.status }}"><span class="dot"></span></span>
+            {{ h.status }} <span class="dropnote">{{ h.changed_at|replace("T", " ") }}</span></li>
+          {% endfor %}
+        </ol>
+      </div>
+    </div>
+
+  </div><!-- /.detail-side -->
+  </div><!-- /.detail-cols -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/tracker_detail.js"></script>
+{% endblock %}

@@ -411,7 +411,12 @@ Status: ✅ = implemented (M1–M4). Others are planned for their milestone.
 | `/letters/new` | GET | ✅ Cover letter page (pick application → draft → edit → export) |
 | `/api/letters/generate` | POST | ✅ Outline + per-beat draft pipeline → editable letter text |
 | `/api/letters/export` | POST | ✅ Edited letter → .md + .pdf in data/letters/, linked to the application |
-| `/api/applications` (+`/{id}`, `/{id}/status`) | CRUD | Tracker |
+| `/tracker` | GET | ✅ Dashboard: applications grouped by status, counts, match scores, overdue next-actions |
+| `/tracker/{id}` | GET | ✅ Detail page: JD/match, notes, next-action, artifact links, status history |
+| `/data/{versions\|letters}/{file}` | GET | ✅ Serve tracker-linked CV snapshots + letter PDFs (path-traversal guarded) |
+| `/api/applications` | POST | ✅ Create an application (no LLM) |
+| `/api/applications/{id}` | PUT/DELETE | ✅ Update fields / delete (status excluded — see below) |
+| `/api/applications/{id}/status` | PUT | ✅ Status transition → status_history (stamps applied_date on first "applied") |
 | `/api/applications/{id}/interview/{questions\|star\|pitch}` | POST | Interview prep generators (§5.7) |
 
 ---
@@ -466,10 +471,21 @@ Each milestone ends runnable and independently useful.
   links the PDF to the application. LLM inputs are always the digest/extraction,
   never raw documents; a failed beat degrades to an empty paragraph, not a lost
   letter.
-- **M5 — Tracker**
-  SQLite DAO, dashboard with match scores, detail page, linking versions/letters,
-  status history. (Built last so it can link artifacts from M3/M4; the schema exists
-  from M1.)
+- **M5 — Tracker** ✅ DONE
+  Full SQLite DAO (`tracker.py`): status transitions routed through `set_status`
+  so `status_history` stays authoritative (no-op dedup, `applied_date` stamped on
+  the first move to "applied"), plus delete (cascades history) and a `dashboard()`
+  helper that groups applications by status in workflow order with per-status
+  counts and an overdue flag on past-due `next_action_date`. `/tracker` is now the
+  app's home once a CV exists: a status-count strip + per-status tables showing
+  match score, applied date, next action (overdue highlighted) and artifact icons;
+  a "+ New application" form creates entries with no LLM. `/tracker/{id}` detail
+  page: status selector, the cached JD + extracted requirement chips, a
+  Markdown notes editor, next-action fields, servable links to the exact tailored
+  CV snapshot and cover-letter PDF (`/data/versions|letters/…`, path-traversal
+  guarded), status history, and a "Tailor CV for this job →" deep link
+  (`/tailor?app={id}` pre-selects the application and loads its cached match). An
+  Interview-prep-kit placeholder marks where M6 lands.
 - **M6 — Interview Prep Kit**
   Question generator, STAR story builder, personal pitch — all on the application
   detail page. (Needs M3's JD extraction and M5's detail page.)

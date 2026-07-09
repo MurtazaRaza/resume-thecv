@@ -11,6 +11,7 @@
 <body>
   <nav class="topnav">
     <span class="brand">Resume the CV</span>
+    <a href="/tracker" {% if request.url.path.startswith('/tracker') %}class="active"{% endif %}>Tracker</a>
     <a href="/editor" {% if request.url.path == '/editor' %}class="active"{% endif %}>Editor</a>
     <a href="/tailor" {% if request.url.path == '/tailor' %}class="active"{% endif %}>Tailor</a>
     <a href="/letters/new" {% if request.url.path == '/letters/new' %}class="active"{% endif %}>Letter</a>

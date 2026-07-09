@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Tracker — Resume the CV{% endblock %}
+
+{% block content %}
+<div class="tracker-wrap">
+
+  <div class="tracker-head">
+    <h1>Applications <span class="dropnote">({{ dashboard.total }})</span></h1>
+    <button type="button" class="btn btn-primary" id="new-app-btn">+ New application</button>
+  </div>
+
+  <!-- status count strip -->
+  <div class="status-strip">
+    {% for s in statuses %}
+    <span class="status-count status-{{ s }}">
+      <span class="dot"></span>{{ s }} <b>{{ dashboard.counts[s] }}</b>
+    </span>
+    {% endfor %}
+  </div>
+
+  <!-- add-application form (hidden until "+ New application") -->
+  <div class="pane" id="new-app-pane" hidden>
+    <div class="pane-body">
+      <div class="row">
+        <label>Company<input type="text" id="na-company" placeholder="Acme Corp"></label>
+        <label>Role<input type="text" id="na-role" placeholder="Backend Engineer"></label>
+        <label>Job URL (optional)<input type="text" id="na-url" placeholder="https://…"></label>
+      </div>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="na-create">Create</button>
+        <button type="button" class="btn" id="na-cancel">Cancel</button>
+        <span id="na-status" class="dropnote"></span>
+      </div>
+    </div>
+  </div>
+
+  {% if not dashboard.groups %}
+  <div class="warnbox" id="empty-note">No applications yet. Add one above, or head to
+    <a href="/tailor">Tailor</a> to paste a job description and create one automatically.</div>
+  {% endif %}
+
+  {% for group in dashboard.groups %}
+  <div class="status-group">
+    <h3 class="status-group-head status-{{ group.status }}">
+      <span class="dot"></span>{{ group.status }}
+      <span class="group-count">{{ group.apps|length }}</span>
+    </h3>
+    <table class="app-table">
+      <thead>
+        <tr>
+          <th>Company</th><th>Role</th><th class="c">Match</th>
+          <th>Applied</th><th>Next action</th><th class="c">Artifacts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in group.apps %}
+        <tr class="app-row" data-href="/tracker/{{ a.id }}">
+          <td class="company">{{ a.company }}</td>
+          <td>{{ a.role }}</td>
+          <td class="c">
+            {% if a.match_score is not none %}
+            <span class="match-pill {% if a.match_score >= 70 %}good{% elif a.match_score >= 40 %}mid{% else %}low{% endif %}">{{ a.match_score }}%</span>
+            {% else %}<span class="dropnote">—</span>{% endif %}
+          </td>
+          <td>{{ a.applied_date or "—" }}</td>
+          <td class="{% if a.overdue %}overdue{% endif %}">
+            {% if a.next_action %}{{ a.next_action }}{% if a.next_action_date %}
+              <span class="na-date">({{ a.next_action_date }})</span>{% endif %}
+            {% else %}<span class="dropnote">—</span>{% endif %}
+          </td>
+          <td class="c artifacts">
+            {% if a.cv_version_path %}<span title="Tailored CV saved">📄</span>{% endif %}
+            {% if a.cover_letter_path %}<span title="Cover letter saved">✉</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/tracker.js"></script>
+{% endblock %}

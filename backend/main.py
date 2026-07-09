@@ -42,7 +42,10 @@ def page_ctx(request: Request, **extra):
 @app.get("/")
 def home():
     cv = cv_model.load_cv()
-    return RedirectResponse("/import" if cv_model.cv_is_empty(cv) else "/editor")
+    if cv_model.cv_is_empty(cv):
+        return RedirectResponse("/import")
+    # /tracker is the app's home once a CV exists (SPEC §5.6)
+    return RedirectResponse("/tracker")
 
 
 @app.get("/editor")
@@ -112,6 +115,22 @@ def render_cv():
 def out_file(filename: str):
     path = (config.OUT_DIR / filename).resolve()
     if config.OUT_DIR.resolve() not in path.parents or not path.is_file():
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return FileResponse(path)
+
+
+# Serve tracker-linked artifacts (tailored CV snapshots, cover letter PDFs/md).
+# Restricted to these two dirs and path-traversal guarded like /out.
+_ARTIFACT_DIRS = {"versions": config.VERSIONS_DIR, "letters": config.LETTERS_DIR}
+
+
+@app.get("/data/{kind}/{filename}")
+def artifact_file(kind: str, filename: str):
+    base = _ARTIFACT_DIRS.get(kind)
+    if base is None:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    path = (base / filename).resolve()
+    if base.resolve() not in path.parents or not path.is_file():
         return JSONResponse({"error": "not found"}, status_code=404)
     return FileResponse(path)
 
@@ -363,6 +382,93 @@ async def letters_export(request: Request):
     stamp = int(pdf_path.stat().st_mtime)
     return {"markdown": str(md_path.relative_to(config.PROJECT_ROOT)),
             "pdf": rel_pdf, "pdf_url": f"/out/letter.pdf?v={stamp}"}
+
+
+# --- tracker (M5, §5.6) ---------------------------------------------------------
+
+@app.get("/tracker")
+def tracker_page(request: Request):
+    return templates.TemplateResponse("tracker.html", page_ctx(
+        request, dashboard=tracker.dashboard(), statuses=tracker.STATUSES))
+
+
+@app.get("/tracker/{app_id}")
+def tracker_detail_page(request: Request, app_id: int):
+    entry = tracker.get_application(app_id)
+    if entry is None:
+        return RedirectResponse("/tracker")
+    extraction = None
+    if entry["jd_extraction"]:
+        try:
+            extraction = json.loads(entry["jd_extraction"])
+        except (ValueError, TypeError):
+            extraction = None
+    return templates.TemplateResponse("tracker_detail.html", page_ctx(
+        request, app=entry, extraction=extraction, statuses=tracker.STATUSES,
+        cv_version_url=_artifact_url(entry["cv_version_path"]),
+        cover_letter_url=_artifact_url(entry["cover_letter_path"]),
+        history=tracker.get_status_history(app_id)))
+
+
+def _artifact_url(rel_path):
+    """Map a stored 'data/versions/...' or 'data/letters/...' path to its
+    servable /data/<kind>/<file> URL, or None if it isn't one of those."""
+    if not rel_path:
+        return None
+    parts = rel_path.replace("\\", "/").split("/")
+    if len(parts) >= 3 and parts[0] == "data" and parts[1] in _ARTIFACT_DIRS:
+        return f"/data/{parts[1]}/{parts[-1]}"
+    return None
+
+
+@app.post("/api/applications")
+async def create_application(request: Request):
+    data = await request.json()
+    company = (data.get("company") or "").strip()
+    role = (data.get("role") or "").strip()
+    if not company or not role:
+        return JSONResponse({"error": "Company and role are required"},
+                            status_code=422)
+    app_id = tracker.create_application(company, role, (data.get("url") or "").strip())
+    return {"id": app_id}
+
+
+@app.put("/api/applications/{app_id}")
+async def update_application(app_id: int, request: Request):
+    if tracker.get_application(app_id) is None:
+        return JSONResponse({"error": "Application not found"}, status_code=404)
+    data = await request.json()
+    fields = {k: v for k, v in data.items() if k in tracker._UPDATABLE}
+    unknown = set(data) - tracker._UPDATABLE
+    if unknown:
+        return JSONResponse(
+            {"error": f"Cannot update fields: {', '.join(sorted(unknown))}"},
+            status_code=422)
+    try:
+        tracker.update_application(app_id, **fields)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+    return {"ok": True}
+
+
+@app.put("/api/applications/{app_id}/status")
+async def set_application_status(app_id: int, request: Request):
+    if tracker.get_application(app_id) is None:
+        return JSONResponse({"error": "Application not found"}, status_code=404)
+    status = (await request.json()).get("status", "")
+    try:
+        tracker.set_status(app_id, status)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=422)
+    return {"ok": True, "history": tracker.get_status_history(app_id)}
+
+
+@app.delete("/api/applications/{app_id}")
+def delete_application(app_id: int):
+    if tracker.get_application(app_id) is None:
+        return JSONResponse({"error": "Application not found"}, status_code=404)
+    tracker.delete_application(app_id)
+    return {"ok": True}
 
 
 # --- import --------------------------------------------------------------------

@@ -362,4 +362,15 @@
       btn.disabled = false;
     }
   });
+
+  // Deep link from the tracker detail page: /tailor?app=<id> pre-selects that
+  // application and loads its cached JD + match (if the option exists).
+  const preId = new URLSearchParams(window.location.search).get("app");
+  if (preId) {
+    const sel = $("#app-select");
+    if ([...sel.options].some((o) => o.value === preId)) {
+      sel.value = preId;
+      sel.dispatchEvent(new Event("change"));
+    }
+  }
 })();
