@@ -89,8 +89,13 @@
           diff.innerHTML = '<p class="diff-empty">No changes yet — accept a ' +
             "rewrite, swap the title, or add a gap skill to see the diff.</p>";
         } else {
-          diff.innerHTML = CVDiff.unified(data.master_yaml, data.tailored_yaml,
-                                          { context: 2 });
+          // Diff only user-authored content: drop bullet `id:` bookkeeping so
+          // the hashes never surface as meaningless diff lines. The "Full YAML"
+          // tab still shows the raw tailored_yaml, ids included.
+          diff.innerHTML = CVDiff.unified(
+            CVDiff.stripBookkeeping(data.master_yaml),
+            CVDiff.stripBookkeeping(data.tailored_yaml),
+            { context: 2 });
         }
         status.textContent = "";
       } catch (e) {

@@ -136,5 +136,27 @@
     return out;
   }
 
-  window.CVDiff = { words, unified, escapeHtml };
+  // Strip machine-generated bookkeeping (bullet `id:` hashes) from a CV YAML
+  // string so the whole-CV diff only shows content the user actually wrote.
+  // Bullets dump as `- id: <hash>` then `  text: ...` on the next line; we drop
+  // the id and fold the `-` list marker onto the text line, so the bullet reads
+  // `- text: ...` and pairs cleanly instead of leaving an orphan `-` line.
+  function stripBookkeeping(yamlStr) {
+    const lines = (yamlStr || "").split("\n");
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^(\s*)- id: \S+$/);
+      const next = lines[i + 1];
+      const nm = next != null ? next.match(/^(\s+)text: (.*)$/) : null;
+      if (m && nm) {                       // `- id: X` immediately followed by `text:`
+        out.push(m[1] + "- text: " + nm[2]);
+        i++;                               // consume the text line too
+      } else {
+        out.push(lines[i]);
+      }
+    }
+    return out.join("\n");
+  }
+
+  window.CVDiff = { words, unified, escapeHtml, stripBookkeeping };
 })();
