@@ -354,15 +354,22 @@ Preview: editor's right pane shows the compiled PDF in an `<embed>`, refreshed o
 
 ## 8. HTTP API (internal, consumed by htmx)
 
+Status: ✅ = implemented (M1–M2). Others are planned for their milestone.
+
 | Route | Method | Purpose |
 |---|---|---|
-| `/` | GET | Tracker dashboard |
-| `/editor` | GET | CV editor (form + YAML mode + preview + analyzer panel) |
-| `/api/cv` | GET/PUT | Load/save canonical CV |
-| `/api/cv/render` | POST | Compile PDF + txt, return preview URL |
-| `/api/analyze` | POST | Run rules engine, return findings |
-| `/api/analyze/grammar` | POST | LLM grammar pass for one section |
-| `/api/bullets/{id}/optimize` | POST | Checks + rewrite candidates for one bullet |
+| `/` | GET | ✅ Redirects to /import (empty CV) or /editor |
+| `/editor` | GET | ✅ CV editor (form + YAML tab + preview + Checks tab) |
+| `/import` | GET | ✅ Onboarding import page |
+| `/api/cv` | GET/PUT | ✅ Load/save canonical CV (JSON) |
+| `/api/cv/yaml` | GET/PUT | ✅ Load/save CV as raw YAML (YAML tab) |
+| `/api/cv/yaml/preview` | POST | ✅ Form-state → YAML without saving |
+| `/api/cv/render` | POST | ✅ Compile PDF + txt, return preview URLs |
+| `/out/{file}` | GET | ✅ Serve compiled PDF/txt (path-traversal guarded) |
+| `/api/import` | POST | ✅ PDF/DOCX/text upload → parsed YAML, saved |
+| `/api/analyze` | POST | ✅ Rules engine on posted CV state → findings |
+| `/api/analyze/grammar` | POST | ✅ LLM grammar pass for one section |
+| `/api/bullets/optimize` | POST | ✅ Checks + rewrite candidates for a posted bullet |
 | `/api/tailor/extract` | POST | JD → extraction JSON (cached on tracker entry) |
 | `/api/tailor/suggest` | POST | Missing-keyword bullet suggestions |
 | `/api/tailor/apply` | POST | Accepted changes → version snapshot |
@@ -380,14 +387,20 @@ Preview: editor's right pane shows the compiled PDF in an `<embed>`, refreshed o
 
 Each milestone ends runnable and independently useful.
 
-- **M1 — Foundation & Editor** *(the core "edit my own CV" ability)*
+- **M1 — Foundation & Editor** *(the core "edit my own CV" ability)* ✅ DONE
   Scaffold FastAPI + config + Ollama client smoke test. CV model + YAML load/save +
   bullet IDs. Typst templates + render + txt export. Editor page with form editing,
   raw-YAML tab, live PDF preview. Onboarding import (PDF/DOCX upload or paste →
   section split → LLM parse → review).
-- **M2 — Analyzer + Bullet Optimizer**
-  Rules engine (incl. bias + readability checks) + sidebar panel. Per-bullet optimize
-  with accept/reject. LLM grammar pass.
+- **M2 — Analyzer + Bullet Optimizer** ✅ DONE
+  Rules engine (`analyzer.py`: dates, tense, consistency, repetition, ATS, bias,
+  readability, completeness, aggregated bullet-quality) surfaced in a "Checks" tab
+  in the right pane (re-runs on save, clickable findings jump to the bullet).
+  Per-bullet ✨ optimize popover (`optimizer.py`): instant deterministic checks +
+  a tightened rewrite, plus a metric-placeholder variant from a *separate* focused
+  LLM call (3B models skip the scaffold in a combined prompt). On-demand LLM grammar
+  pass per section returning quote/issue/fix. Suggestions are apply-or-ignore; never
+  auto-applied.
 - **M3 — Job Tailoring**
   JD extraction, keyword matching + match score, skills-gap confirmation flow,
   per-bullet suggestion flow, version snapshots.

@@ -96,3 +96,53 @@ Example output:
 {"certifications": [{"name": "AWS Solutions Architect Associate",
  "issuer": "Amazon", "date": "2024-01"},
  {"name": "Scrum Master Certification", "issuer": "Scrum.org", "date": ""}]}"""
+
+# --- §5.2 bullet optimizer ----------------------------------------------------
+
+BULLET_REWRITE = """You tighten one resume bullet point. Respond with ONLY valid JSON:
+{"tightened": str or null}
+tightened = the same achievement in max 24 words, starting with a strong
+past-tense action verb, filler removed, wording sharpened. Keep ALL facts
+exactly. Never invent facts, numbers, employers, or technologies. If the bullet
+is already tight and strong with nothing to improve, use null.
+
+Example input:
+Bullet: Responsible for helping with the migration of various legacy services to AWS which resulted in improvements in reliability
+Flags: filler, no metric, too long
+Example output:
+{"tightened": "Migrated legacy services to AWS, improving reliability"}"""
+
+BULLET_METRIC = """You add a measurement placeholder to a resume bullet that has
+no number. Respond with ONLY valid JSON: {"metric_variant": str}
+Rewrite the bullet inserting ONE bracketed placeholder — like [X%], [N],
+[$Y], [N users], [Nx] — at the single spot where a real, quantifiable result
+would most strengthen it. The placeholder is a blank the user fills in later.
+Rules: insert placeholders ONLY, never a real number. Keep every existing fact.
+Change as little else as possible. Always return a metric_variant (this bullet
+was already selected because it lacks a metric).
+
+Example input:
+Reduced page load time on the checkout flow
+Example output:
+{"metric_variant": "Reduced checkout page load time by [X%]"}
+
+Example input:
+Managed a team of engineers to ship the mobile app
+Example output:
+{"metric_variant": "Managed a team of [N] engineers to ship the mobile app"}"""
+
+# --- §5.4 LLM grammar pass ----------------------------------------------------
+
+GRAMMAR = """You proofread resume text. Report grammar, spelling, and punctuation
+errors only — never style or content rewrites. Respond with ONLY valid JSON:
+{"issues": [{"quote": str, "issue": str, "fix": str}]}
+quote = the exact words copied from the text that contain the error (max 10
+words). Max 5 issues. If there are no errors return {"issues": []}. Never
+invent errors just to fill the list.
+
+Example input:
+Lead a team of five engineer to deliver the the payments platform
+Example output:
+{"issues": [{"quote": "Lead a team", "issue": "wrong tense", "fix": "Led a team"},
+ {"quote": "five engineer", "issue": "missing plural", "fix": "five engineers"},
+ {"quote": "the the payments", "issue": "duplicated word", "fix": "the payments"}]}"""

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from backend import config
-from backend.core import cv_model, importer, render, tracker
+from backend.core import analyzer, cv_model, importer, optimizer, render, tracker
 from backend.llm.provider import LLMError, get_provider
 
 app = FastAPI(title="Resume the CV")
@@ -112,6 +112,40 @@ def out_file(filename: str):
     if config.OUT_DIR.resolve() not in path.parents or not path.is_file():
         return JSONResponse({"error": "not found"}, status_code=404)
     return FileResponse(path)
+
+
+# --- analyzer + bullet optimizer (M2) -------------------------------------------
+
+@app.post("/api/analyze")
+async def analyze_cv(request: Request):
+    """Rules engine on the *current* editor state (body = CV JSON)."""
+    cv = cv_model.normalize(await request.json())
+    return {"findings": analyzer.analyze(cv)}
+
+
+@app.post("/api/analyze/grammar")
+async def grammar_pass(request: Request):
+    data = await request.json()
+    cv = cv_model.normalize(data.get("cv") or {})
+    text = analyzer.section_text(cv, data.get("section", "summary"))
+    if not text.strip():
+        return {"issues": [], "empty": True}
+    try:
+        return {"issues": optimizer.grammar_check(text, get_provider())}
+    except LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+
+@app.post("/api/bullets/optimize")
+async def optimize_bullet(request: Request):
+    data = await request.json()
+    text = (data.get("text") or "").strip()
+    if not text:
+        return JSONResponse({"error": "Empty bullet"}, status_code=422)
+    try:
+        return optimizer.optimize(text, get_provider())
+    except LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
 
 
 # --- import --------------------------------------------------------------------

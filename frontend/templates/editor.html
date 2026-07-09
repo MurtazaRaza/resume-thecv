@@ -6,6 +6,7 @@
   <span class="drag">•</span>
   <input type="hidden" data-f="id" value="{{ b.id }}">
   <textarea data-f="text" rows="1" placeholder="Achievement bullet…">{{ b.text }}</textarea>
+  <button type="button" class="btn-ghost opt-bullet" title="Optimize with local LLM">✨</button>
   <button type="button" class="btn-ghost rm-bullet" title="Remove bullet">✕</button>
 </div>
 {%- endmacro %}
@@ -156,17 +157,38 @@
 
   <div class="pane">
     <div class="pane-head">
-      <strong>Preview</strong>
+      <div class="tabs">
+        <button type="button" class="tab active" data-rtab="preview">Preview</button>
+        <button type="button" class="tab" data-rtab="checks">Checks <span id="checks-count" class="count-badge" hidden></span></button>
+      </div>
       <span class="nav-spacer" style="flex:1"></span>
       <a class="btn btn-sm" href="/out/cv.pdf" target="_blank" id="pdf-link">PDF ↗</a>
       <a class="btn btn-sm" href="/out/cv.txt" target="_blank" id="txt-link">ATS .txt ↗</a>
     </div>
+
+    <div id="rtab-preview">
     {% if typst_ok %}
       <iframe class="preview-frame" id="preview" title="PDF preview"></iframe>
     {% else %}
       <div class="preview-empty">PDF preview disabled — typst binary not found.<br>
         Drop it in <code>tools/typst</code> or <code>brew install typst</code>, then restart.</div>
     {% endif %}
+    </div>
+
+    <div class="pane-body checks-body" id="rtab-checks" hidden>
+      <div id="findings"><p class="dropnote">Running checks…</p></div>
+      <div class="grammar-bar">
+        <select id="grammar-section">
+          <option value="summary">Summary</option>
+          <option value="experience">Experience bullets</option>
+          <option value="projects">Project bullets</option>
+          <option value="education">Education</option>
+        </select>
+        <button type="button" class="btn btn-sm" id="run-grammar">Grammar check (LLM)</button>
+        <span id="grammar-status" class="dropnote"></span>
+      </div>
+      <div id="grammar-results"></div>
+    </div>
   </div>
 </div>
 

@@ -119,6 +119,7 @@
       applyIds(data);
       status.textContent = "saved " + new Date().toLocaleTimeString();
       refreshPreview();
+      runAnalysis();
     } catch (e) {
       status.textContent = "";
       toast("Save failed: " + e.message, true);
@@ -132,11 +133,11 @@
     if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); save(); }
   });
 
-  // ---- tabs -------------------------------------------------------------------
+  // ---- left-pane tabs (form / yaml) ------------------------------------------
   let activeTab = "form";
-  $$(".tab").forEach((btn) => btn.addEventListener("click", async () => {
+  $$("[data-tab]").forEach((btn) => btn.addEventListener("click", async () => {
     activeTab = btn.dataset.tab;
-    $$(".tab").forEach((b) => b.classList.toggle("active", b === btn));
+    $$("[data-tab]").forEach((b) => b.classList.toggle("active", b === btn));
     $("#tab-form").hidden = activeTab !== "form";
     $("#tab-yaml").hidden = activeTab !== "yaml";
     if (activeTab === "yaml") {
@@ -148,6 +149,15 @@
       });
       $("#yaml-text").value = await resp.text();
     }
+  }));
+
+  // ---- right-pane tabs (preview / checks) ------------------------------------
+  $$("[data-rtab]").forEach((btn) => btn.addEventListener("click", () => {
+    const which = btn.dataset.rtab;
+    $$("[data-rtab]").forEach((b) => b.classList.toggle("active", b === btn));
+    $("#rtab-preview").hidden = which !== "preview";
+    $("#rtab-checks").hidden = which !== "checks";
+    if (which === "checks") runAnalysis();
   }));
 
   // ---- add/remove entries -----------------------------------------------------
@@ -174,6 +184,8 @@
       const holder = $(".bullets", t.closest(".entry"));
       holder.appendChild($("#tpl-bullet").content.cloneNode(true));
       holder.lastElementChild.querySelector("textarea").focus();
+    } else if (t.classList.contains("opt-bullet")) {
+      optimizeBullet(t.closest(".bullet-row"));
     } else if (t.classList.contains("rm-bullet") || t.classList.contains("rm-row")) {
       t.closest(".bullet-row").remove();
     } else if (t.classList.contains("rm-entry")) {
@@ -189,6 +201,196 @@
     }
   });
 
-  // initial preview
+  // ---- analyzer (Checks tab) --------------------------------------------------
+  const CAT_ORDER = { error: 0, warn: 1, info: 2 };
+  let analysisSeq = 0;
+
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  async function runAnalysis() {
+    const seq = ++analysisSeq;
+    const box = $("#findings");
+    try {
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(serialize()),
+      });
+      const data = await resp.json();
+      if (seq !== analysisSeq) return; // a newer run superseded this one
+      renderFindings(data.findings || []);
+    } catch (e) {
+      if (seq === analysisSeq) box.innerHTML =
+        '<p class="dropnote">Checks failed: ' + escapeHtml(e.message) + "</p>";
+    }
+  }
+
+  function renderFindings(findings) {
+    const box = $("#findings");
+    const badge = $("#checks-count");
+    const actionable = findings.filter((f) => f.severity !== "info").length;
+    if (actionable > 0) {
+      badge.textContent = actionable;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+    if (!findings.length) {
+      box.innerHTML = '<p class="checks-empty">✓ No issues found. Nice.</p>';
+      return;
+    }
+    box.innerHTML = findings.map((f) => {
+      const ids = f.bullet_ids || (f.bullet_id ? [f.bullet_id] : []);
+      const cls = "finding " + f.severity + (ids.length ? " clickable" : "");
+      const attr = ids.length ? ' data-bullets="' + ids.join(",") + '"' : "";
+      return '<div class="' + cls + '"' + attr + '>' +
+        '<span class="sev">' + f.severity + '</span>' +
+        '<div><div>' + escapeHtml(f.message) + "</div>" +
+        '<span class="cat">' + escapeHtml(f.category) + "</span></div></div>";
+    }).join("");
+  }
+
+  // click a finding -> jump to & flash the first referenced bullet
+  $("#findings").addEventListener("click", (e) => {
+    const card = e.target.closest("[data-bullets]");
+    if (!card) return;
+    const firstId = card.dataset.bullets.split(",")[0];
+    const idField = $$('#tab-form [data-f="id"]').find((el) => el.value === firstId);
+    if (!idField) return;
+    if (activeTab !== "form") $('[data-tab="form"]').click();
+    const row = idField.closest(".bullet-row");
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("flash");
+    void row.offsetWidth; // restart the animation
+    row.classList.add("flash");
+  });
+
+  // ---- grammar pass (LLM) -----------------------------------------------------
+  $("#run-grammar").addEventListener("click", async () => {
+    const btn = $("#run-grammar");
+    const section = $("#grammar-section").value;
+    const gstatus = $("#grammar-status");
+    const results = $("#grammar-results");
+    btn.disabled = true;
+    gstatus.innerHTML = '<span class="spinner" style="border-color:#999;border-top-color:transparent"></span> checking…';
+    results.innerHTML = "";
+    try {
+      const resp = await fetch("/api/analyze/grammar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cv: serialize(), section }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || resp.statusText);
+      gstatus.textContent = "";
+      if (data.empty) {
+        results.innerHTML = '<p class="dropnote">That section is empty.</p>';
+      } else if (!data.issues.length) {
+        results.innerHTML = '<p class="checks-empty">✓ No grammar issues found.</p>';
+      } else {
+        results.innerHTML = data.issues.map((i) =>
+          '<div class="gissue"><del>' + escapeHtml(i.quote) + "</del> → <ins>" +
+          escapeHtml(i.fix) + "</ins>" +
+          (i.issue ? ' <span class="issue-tag">(' + escapeHtml(i.issue) + ")</span>" : "") +
+          "</div>").join("");
+      }
+    } catch (e) {
+      gstatus.textContent = "";
+      results.innerHTML = '<p class="dropnote">Grammar check failed: ' +
+        escapeHtml(e.message) + "</p>";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ---- per-bullet optimize popover -------------------------------------------
+  let openPop = null;
+  function closePop() { if (openPop) { openPop.remove(); openPop = null; } }
+  document.addEventListener("click", (e) => {
+    if (openPop && !openPop.contains(e.target) &&
+        !e.target.classList.contains("opt-bullet")) closePop();
+  });
+
+  async function optimizeBullet(row) {
+    closePop();
+    const ta = field(row, "text");
+    const text = ta.value.trim();
+    if (!text) { toast("Write the bullet first", true); return; }
+
+    const pop = document.createElement("div");
+    pop.className = "opt-pop";
+    pop.innerHTML = '<button type="button" class="btn-ghost close-x">✕</button>' +
+      '<h4>Optimizing…</h4><p><span class="spinner" ' +
+      'style="border-color:#999;border-top-color:transparent"></span> asking the local model</p>';
+    document.body.appendChild(pop);
+    openPop = pop;
+    positionPop(pop, row);
+    pop.querySelector(".close-x").addEventListener("click", closePop);
+
+    try {
+      const resp = await fetch("/api/bullets/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || resp.statusText);
+      if (openPop !== pop) return; // user closed it while waiting
+      renderPop(pop, row, ta, data);
+      positionPop(pop, row);
+    } catch (e) {
+      if (openPop === pop) pop.innerHTML =
+        '<button type="button" class="btn-ghost close-x">✕</button>' +
+        '<p class="dropnote">Failed: ' + escapeHtml(e.message) + "</p>";
+      pop.querySelector(".close-x")?.addEventListener("click", closePop);
+    }
+  }
+
+  function renderPop(pop, row, ta, data) {
+    let html = '<button type="button" class="btn-ghost close-x">✕</button>';
+    if (data.checks.length) {
+      html += "<h4>Checks</h4>";
+      html += data.checks.map((c) =>
+        '<div class="opt-check">• ' + escapeHtml(c.message) + "</div>").join("");
+    }
+    if (data.suggestions.length) {
+      html += "<h4>Suggestions</h4>";
+      data.suggestions.forEach((s, i) => {
+        html += '<div class="opt-suggestion"><div class="lbl">' +
+          escapeHtml(s.label) + '</div><div class="txt">' + escapeHtml(s.text) +
+          '</div><button type="button" class="btn btn-sm btn-primary apply-sug" ' +
+          'data-i="' + i + '">Apply</button></div>';
+      });
+    } else if (!data.checks.length) {
+      html += '<p class="none">✓ This bullet looks good.</p>';
+    } else {
+      html += '<p class="dropnote">No automatic rewrite — the model couldn\'t ' +
+        "improve it without inventing facts.</p>";
+    }
+    pop.innerHTML = html;
+    pop.querySelector(".close-x").addEventListener("click", closePop);
+    pop.querySelectorAll(".apply-sug").forEach((b) => b.addEventListener("click", () => {
+      ta.value = data.suggestions[+b.dataset.i].text;
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      closePop();
+      toast("Applied — remember to Save");
+    }));
+  }
+
+  function positionPop(pop, row) {
+    const r = row.getBoundingClientRect();
+    const top = window.scrollY + r.bottom + 6;
+    let left = window.scrollX + r.left;
+    left = Math.min(left, window.scrollX + document.documentElement.clientWidth - pop.offsetWidth - 12);
+    pop.style.top = top + "px";
+    pop.style.left = Math.max(8, left) + "px";
+  }
+
+  // initial preview + analysis
   refreshPreview();
+  runAnalysis();
 })();
