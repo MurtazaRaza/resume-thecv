@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Resume the CV{% endblock %}</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('cv-theme');
+        var dark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.dataset.theme = 'dark';
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/vendor/htmx.min.js" defer></script>
   <script src="/static/diff.js"></script>
@@ -17,6 +26,10 @@
     <a href="/letters/new" {% if request.url.path == '/letters/new' %}class="active"{% endif %}>Letter</a>
     <a href="/import" {% if request.url.path == '/import' %}class="active"{% endif %}>Import</a>
     <span class="nav-spacer"></span>
+    <button type="button" id="theme-toggle" class="btn btn-ghost theme-toggle" aria-pressed="false" aria-label="Switch to dark mode" title="Dark mode">
+      <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+      <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
+    </button>
     <span class="nav-status" title="Local LLM model">{{ model }}</span>
     {% if not typst_ok %}
       <span class="nav-warn" title="PDF rendering disabled. Put the typst binary in tools/ or brew install typst.">⚠ typst missing</span>
@@ -26,6 +39,7 @@
     {% block content %}{% endblock %}
   </main>
   <div id="toast" class="toast" hidden></div>
+  <script src="/static/theme.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

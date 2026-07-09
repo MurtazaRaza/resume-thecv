@@ -115,7 +115,7 @@
     }));
 
   function spinner(label) {
-    return '<span class="spinner" style="border-color:#999;border-top-color:transparent"></span> ' + label;
+    return '<span class="spinner"></span> ' + label;
   }
 
   // ---- step 1: extract & match -----------------------------------------------

@@ -305,7 +305,7 @@
     const gstatus = $("#grammar-status");
     const results = $("#grammar-results");
     btn.disabled = true;
-    gstatus.innerHTML = '<span class="spinner" style="border-color:#999;border-top-color:transparent"></span> checking…';
+    gstatus.innerHTML = '<span class="spinner"></span> checking…';
     results.innerHTML = "";
     try {
       const resp = await fetch("/api/analyze/grammar", {
@@ -373,8 +373,7 @@
     const pop = document.createElement("div");
     pop.className = "opt-pop";
     pop.innerHTML = '<button type="button" class="btn-ghost close-x">✕</button>' +
-      '<h4>Optimizing…</h4><p><span class="spinner" ' +
-      'style="border-color:#999;border-top-color:transparent"></span> asking the local model</p>';
+      '<h4>Optimizing…</h4><p><span class="spinner"></span> asking the local model</p>';
     document.body.appendChild(pop);
     openPop = pop;
     positionPop(pop, row);
@@ -500,8 +499,7 @@
     const pop = document.createElement("div");
     pop.className = "opt-pop";
     pop.innerHTML = '<button type="button" class="btn-ghost close-x">✕</button>' +
-      '<h4>Headline options</h4><p><span class="spinner" ' +
-      'style="border-color:#999;border-top-color:transparent"></span> asking the local model</p>';
+      '<h4>Headline options</h4><p><span class="spinner"></span> asking the local model</p>';
     document.body.appendChild(pop);
     openPop = pop;
     positionPop(pop, wrap);
