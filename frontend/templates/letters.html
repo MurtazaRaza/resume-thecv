@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Cover letter — Resume the CV{% endblock %}
+
+{% block content %}
+<div class="tailor-wrap">
+
+  {% if cv_empty %}
+  <div class="warnbox">⚠ Your CV is empty — <a href="/import">import it</a> first.</div>
+  {% endif %}
+  {% if not ollama_ok %}
+  <div class="warnbox">⚠ Ollama doesn't seem to be running at its configured URL.
+    Start it with <code>ollama serve</code> (or open the Ollama app), then retry.</div>
+  {% endif %}
+  {% if not applications %}
+  <div class="warnbox">No applications with an analyzed job description yet.
+    Go to <a href="/tailor">Tailor</a>, paste a JD and run “Extract &amp; match”
+    first — the letter is built from that application's requirements.</div>
+  {% endif %}
+
+  <div class="tailor-cols">
+  <div class="tailor-steps">
+
+  <!-- step 1: pick application + tone -->
+  <div class="pane">
+    <div class="pane-head"><strong>1 · Application &amp; tone</strong></div>
+    <div class="pane-body">
+      <div class="row">
+        <label>Application
+          <select id="app-select">
+            <option value="">— pick an application —</option>
+            {% for a in applications %}
+            <option value="{{ a.id }}">{{ a.company }} — {{ a.role }} ({{ a.status }})</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Tone
+          <select id="tone-select">
+            <option value="professional">Professional</option>
+            <option value="warm">Warm</option>
+            <option value="direct">Direct</option>
+          </select>
+        </label>
+      </div>
+      <label>Points to emphasize (optional)
+        <input type="text" id="emphasize"
+          placeholder="e.g. leadership, the AWS migration, willingness to relocate">
+      </label>
+      <p class="dropnote">Built beat-by-beat from this application's job requirements
+        and a digest of your CV — never invents achievements. Everything is editable
+        before you export.</p>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="gen-btn"
+          {% if cv_empty or not applications %}disabled{% endif %}>Generate draft (LLM)</button>
+        <span id="gen-status" class="dropnote"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- step 2: outline + editable draft -->
+  <div class="pane" id="draft-pane" hidden>
+    <div class="pane-head"><strong>2 · Draft</strong></div>
+    <div class="pane-body">
+      <h4 class="subhead">Outline</h4>
+      <ol id="beat-list" class="beat-list"></ol>
+      <h4 class="subhead">Letter (editable)</h4>
+      <textarea id="letter-body" rows="20" spellcheck="true"></textarea>
+    </div>
+  </div>
+
+  <!-- step 3: export -->
+  <div class="pane" id="export-pane" hidden>
+    <div class="pane-head"><strong>3 · Export</strong></div>
+    <div class="pane-body">
+      <p class="dropnote">Saves the letter as Markdown and PDF in
+        <code>data/letters/</code>, linked to this application.</p>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="export-btn">Save &amp; export PDF</button>
+        <span id="export-status" class="dropnote"></span>
+      </div>
+      <div id="export-result" class="apply-result" hidden></div>
+    </div>
+  </div>
+
+  </div><!-- /.tailor-steps -->
+
+  <!-- live PDF preview -->
+  <div class="pane preview-pane" id="preview-pane" hidden>
+    <div class="pane-head"><strong>PDF preview</strong></div>
+    <div class="pane-body">
+      <iframe class="preview-frame" id="letter-preview" title="Cover letter PDF preview"></iframe>
+    </div>
+  </div>
+
+  </div><!-- /.tailor-cols -->
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/letters.js"></script>
+{% endblock %}

@@ -292,10 +292,12 @@
       } else if (!data.issues.length) {
         results.innerHTML = '<p class="checks-empty">✓ No grammar issues found.</p>';
       } else {
-        results.innerHTML = data.issues.map((i) =>
-          '<div class="gissue"><del>' + escapeHtml(i.quote) + "</del> → <ins>" +
-          escapeHtml(i.fix) + "</ins>" +
-          (i.issue ? ' <span class="issue-tag">(' + escapeHtml(i.issue) + ")</span>" : "") +
+        results.innerHTML = data.issues.map((iss, i) =>
+          '<div class="gissue" data-quote="' + escapeHtml(iss.quote).replace(/"/g, "&quot;") +
+          '" data-fix="' + escapeHtml(iss.fix).replace(/"/g, "&quot;") + '">' +
+          CVDiff.words(iss.quote, iss.fix) +
+          (iss.issue ? ' <span class="issue-tag">(' + escapeHtml(iss.issue) + ")</span>" : "") +
+          '<button type="button" class="btn btn-sm apply-grammar">Apply</button>' +
           "</div>").join("");
       }
     } catch (e) {
@@ -305,6 +307,24 @@
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // apply a grammar fix: find the first form field containing the quoted text
+  // and splice in the fix. Suggest-and-approve — the user still has to Save.
+  $("#grammar-results").addEventListener("click", (e) => {
+    if (!e.target.classList.contains("apply-grammar")) return;
+    const card = e.target.closest(".gissue");
+    const quote = card.dataset.quote;
+    const fix = card.dataset.fix;
+    const fields = $$("#tab-form textarea, #tab-form input[type=text]");
+    const target = fields.find((f) => f.value.includes(quote));
+    if (!target) { toast("Couldn't locate that text — edit it by hand", true); return; }
+    target.value = target.value.replace(quote, fix);
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+    card.classList.add("applied");
+    e.target.disabled = true;
+    e.target.textContent = "Applied";
+    toast("Applied — remember to Save");
   });
 
   // ---- per-bullet optimize popover -------------------------------------------
@@ -358,10 +378,15 @@
         '<div class="opt-check">• ' + escapeHtml(c.message) + "</div>").join("");
     }
     if (data.suggestions.length) {
+      const original = ta.value.trim();
       html += "<h4>Suggestions</h4>";
       data.suggestions.forEach((s, i) => {
+        // metric-scaffold variants use [X%]/[N] placeholders — a word-diff
+        // against the original just adds noise there, so only diff rewrites
+        const showDiff = !/\[[^\]]+\]/.test(s.text);
+        const body = showDiff ? CVDiff.words(original, s.text) : escapeHtml(s.text);
         html += '<div class="opt-suggestion"><div class="lbl">' +
-          escapeHtml(s.label) + '</div><div class="txt">' + escapeHtml(s.text) +
+          escapeHtml(s.label) + '</div><div class="txt">' + body +
           '</div><button type="button" class="btn btn-sm btn-primary apply-sug" ' +
           'data-i="' + i + '">Apply</button></div>';
       });
@@ -389,6 +414,95 @@
     pop.style.top = top + "px";
     pop.style.left = Math.max(8, left) + "px";
   }
+
+  // ---- summary + headline generator (M4, §5.3) -------------------------------
+  async function genPost(url) {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cv: serialize() }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    return data;
+  }
+
+  const genSummaryBtn = $("#gen-summary");
+  if (genSummaryBtn) {
+    genSummaryBtn.addEventListener("click", async () => {
+      const status = $("#gen-summary-status");
+      const list = $("#summary-variants");
+      genSummaryBtn.disabled = true;
+      status.textContent = "Asking the local model…";
+      list.hidden = true;
+      try {
+        const data = await genPost("/api/summary/generate");
+        const ta = field($("#sec-summary"), "summary");
+        const current = ta.value.trim();
+        list.innerHTML = data.variants.map((v, i) => {
+          // if there's an existing summary, diff against it; else show plain
+          const body = current ? CVDiff.words(current, v) : escapeHtml(v);
+          return '<div class="variant"><div class="txt">' + body +
+            '</div><button type="button" class="btn btn-sm btn-primary use-variant" ' +
+            'data-i="' + i + '">Use this</button></div>';
+        }).join("");
+        list.hidden = false;
+        list.querySelectorAll(".use-variant").forEach((b) =>
+          b.addEventListener("click", () => {
+            ta.value = data.variants[+b.dataset.i];
+            ta.dispatchEvent(new Event("input", { bubbles: true }));
+            list.hidden = true;
+            toast("Summary set — remember to Save");
+          }));
+        status.textContent = "";
+      } catch (e) {
+        status.textContent = "Failed: " + e.message;
+      } finally {
+        genSummaryBtn.disabled = false;
+      }
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("gen-headline")) return;
+    closePop();
+    const titleInput = field($("#sec-basics"), "title");
+    const wrap = e.target.closest(".field-with-btn") || e.target.parentElement;
+    const pop = document.createElement("div");
+    pop.className = "opt-pop";
+    pop.innerHTML = '<button type="button" class="btn-ghost close-x">✕</button>' +
+      '<h4>Headline options</h4><p><span class="spinner" ' +
+      'style="border-color:#999;border-top-color:transparent"></span> asking the local model</p>';
+    document.body.appendChild(pop);
+    openPop = pop;
+    positionPop(pop, wrap);
+    pop.querySelector(".close-x").addEventListener("click", closePop);
+
+    genPost("/api/headline/generate").then((data) => {
+      if (openPop !== pop) return;
+      let html = '<button type="button" class="btn-ghost close-x">✕</button>' +
+        "<h4>Headline options</h4>";
+      html += data.headlines.map((h, i) =>
+        '<div class="opt-suggestion"><div class="txt">' + escapeHtml(h) +
+        '</div><button type="button" class="btn btn-sm btn-primary use-head" ' +
+        'data-i="' + i + '">Use</button></div>').join("");
+      pop.innerHTML = html;
+      pop.querySelector(".close-x").addEventListener("click", closePop);
+      pop.querySelectorAll(".use-head").forEach((b) =>
+        b.addEventListener("click", () => {
+          titleInput.value = data.headlines[+b.dataset.i];
+          titleInput.dispatchEvent(new Event("input", { bubbles: true }));
+          closePop();
+          toast("Headline set — remember to Save");
+        }));
+      positionPop(pop, wrap);
+    }).catch((err) => {
+      if (openPop !== pop) return;
+      pop.innerHTML = '<button type="button" class="btn-ghost close-x">✕</button>' +
+        '<p class="dropnote">Failed: ' + escapeHtml(err.message) + "</p>";
+      pop.querySelector(".close-x").addEventListener("click", closePop);
+    });
+  });
 
   // initial preview + analysis
   refreshPreview();

@@ -3,6 +3,7 @@
 Flow: CV dict -> display-ready dict -> data/out/cv.json -> `typst compile`.
 The .txt export is generated straight from the same dict for ATS web forms.
 """
+import datetime
 import json
 import subprocess
 from pathlib import Path
@@ -64,6 +65,42 @@ def render_pdf(cv: Dict[str, Any], out_name: str = "cv") -> Path:
            "--root", str(config.PROJECT_ROOT),
            "--input", f"data={rel_json}",
            str(config.TYPST_DIR / "cv.typ"), str(pdf_path)]
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        raise RenderError(f"typst compile failed:\n{proc.stderr.strip()}")
+    return pdf_path
+
+
+def render_letter_pdf(cv: Dict[str, Any], body: str, company: str = "",
+                      out_name: str = "letter") -> Path:
+    """Render an assembled cover letter body to PDF via typst/letter.typ.
+
+    The body is the user's (possibly edited) text; blank-line-separated blocks
+    become paragraphs. Shares the header/contact formatting with the CV so a
+    letter and resume look like one set."""
+    if not config.TYPST_BIN:
+        raise RenderError("Typst binary not found. Expected it in tools/typst "
+                          "(or on PATH via `brew install typst`).")
+    contact_bits = [cv["basics"][k] for k in ("email", "phone", "location")
+                    if cv["basics"][k]]
+    contact_bits += [l["url"] for l in cv["basics"]["links"] if l["url"]]
+    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
+    letter = {
+        "name": cv["basics"]["name"],
+        "contact_line": "  |  ".join(contact_bits),
+        "date": datetime.date.today().strftime("%B %d, %Y"),
+        "company": company,
+        "paragraphs": paragraphs,
+    }
+    config.OUT_DIR.mkdir(parents=True, exist_ok=True)
+    json_path = config.OUT_DIR / f"{out_name}.json"
+    pdf_path = config.OUT_DIR / f"{out_name}.pdf"
+    json_path.write_text(json.dumps(letter, ensure_ascii=False))
+    rel_json = "/" + str(json_path.relative_to(config.PROJECT_ROOT))
+    cmd = [config.TYPST_BIN, "compile",
+           "--root", str(config.PROJECT_ROOT),
+           "--input", f"data={rel_json}",
+           str(config.TYPST_DIR / "letter.typ"), str(pdf_path)]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if proc.returncode != 0:
         raise RenderError(f"typst compile failed:\n{proc.stderr.strip()}")

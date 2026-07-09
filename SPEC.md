@@ -302,6 +302,36 @@ Three independent generators (each its own button, each small-model-sized):
 
 Company research stays manual: the `notes` field is the home for it (non-goal: scraping).
 
+### 5.8 Suggestion Review UI (cross-cutting)
+The app's core promise (§1) is that **every LLM suggestion is suggest-and-approve**.
+That promise is only as good as how legible the review is, so all suggestion
+surfaces share one review vocabulary instead of each inventing its own — a single
+vendored, dependency-free helper (`static/diff.js`, exposes `window.CVDiff`) that
+does word-level and unified diffing with a tiny LCS (no build step, no CDN; the
+text is bullet- or CV-sized, so an O(n·m) table is fine). Diffing is pure
+client-side JS: zero LLM calls, zero extra memory pressure.
+
+- **Word-level diff** — changed words highlighted in place (not two full
+  strikethrough copies) so a 2-word edit reads in a glance. Used by tailor bullet
+  cards, the editor bullet-optimize popover, grammar fixes, and summary variants
+  (each variant diffed against the current summary). Metric-scaffold rewrites
+  (`[X%]` placeholders) skip the diff — it would just be noise.
+- **Editable target** — on the tailor page a suggestion's rewrite lands in an
+  editable field; the word-diff re-renders live as you tweak it, and Accept saves
+  *your edited text*, not the raw model output. Removes the all-or-nothing feel
+  while keeping human approval mandatory. The model's untouched suggestion is
+  remembered so an edited field is marked dirty.
+- **Whole-CV unified diff** — the tailor live preview shows a git-style unified
+  diff of master-vs-tailored YAML (inline, word-highlighted inside changed lines,
+  ±2 lines of context), so before a snapshot is saved every net change is visible
+  at once. A "Full YAML" sub-tab still shows the complete tailored document.
+- **Apply, everywhere** — grammar fixes gained an Apply button they previously
+  lacked (locate the quoted text in a form field, splice in the fix; still needs
+  a manual Save). Consistency: no surface shows a suggestion the user can't act on.
+
+Deliberately NOT a CodeMirror/Monaco-style editor: that needs npm or a CDN
+(violates the vendored/no-build constraint) and is overkill for bullet-sized text.
+
 ---
 
 ## 6. LLM Layer
@@ -354,7 +384,7 @@ Preview: editor's right pane shows the compiled PDF in an `<embed>`, refreshed o
 
 ## 8. HTTP API (internal, consumed by htmx)
 
-Status: ✅ = implemented (M1–M3). Others are planned for their milestone.
+Status: ✅ = implemented (M1–M4). Others are planned for their milestone.
 
 | Route | Method | Purpose |
 |---|---|---|
@@ -374,13 +404,13 @@ Status: ✅ = implemented (M1–M3). Others are planned for their milestone.
 | `/api/tailor/application/{id}` | GET | ✅ Reload a saved application's cached JD + match (dropdown auto-reload) |
 | `/api/tailor/extract` | POST | ✅ JD → extraction JSON (cached on tracker entry) |
 | `/api/tailor/suggest` | POST | ✅ Missing-keyword bullet suggestions (optional user guidance) |
-| `/api/tailor/preview` | POST | ✅ Tailored CV → YAML for the live side-by-side preview |
+| `/api/tailor/preview` | POST | ✅ Master + tailored CV YAML → client renders the live unified diff |
 | `/api/tailor/apply` | POST | ✅ Accepted changes → version snapshot |
-| `/api/summary/generate` | POST | 3 summary variants |
-| `/api/headline/generate` | POST | 3 title-line options |
-| `/api/import` | POST | PDF/DOCX/text upload → parsed YAML for review |
-| `/api/letters/generate` | POST | Outline+draft pipeline → letter text |
-| `/api/letters/{id}/export` | POST | Letter → PDF |
+| `/api/summary/generate` | POST | ✅ 3 summary variants from a deterministic CV digest |
+| `/api/headline/generate` | POST | ✅ 3 ATS-safe title-line options (honesty net drops invented specialties) |
+| `/letters/new` | GET | ✅ Cover letter page (pick application → draft → edit → export) |
+| `/api/letters/generate` | POST | ✅ Outline + per-beat draft pipeline → editable letter text |
+| `/api/letters/export` | POST | ✅ Edited letter → .md + .pdf in data/letters/, linked to the application |
 | `/api/applications` (+`/{id}`, `/{id}/status`) | CRUD | Tracker |
 | `/api/applications/{id}/interview/{questions\|star\|pitch}` | POST | Interview prep generators (§5.7) |
 
@@ -420,9 +450,22 @@ Each milestone ends runnable and independently useful.
   application from the dropdown reloads its cached JD + match report with no LLM
   call. Optional free-text guidance steers rewrite tone (style only — honesty
   rules still win).
-- **M4 — Summary + Cover Letters**
-  Digest computation, summary variants, headline generator, letter pipeline +
-  letter.typ export.
+- **M4 — Summary + Cover Letters** ✅ DONE
+  Summary generator (`summary.py`): deterministic digest (union-of-intervals
+  years of experience, current title, top skills, metric-preferring strongest
+  bullets) → one LLM call for 3 pronoun-free, cliché-banned variants + a
+  separate tiny call for 3 headline options; editor sidebar "✨ Generate
+  summary" and a per-field "✨" headline picker. Headlines carry a deterministic
+  honesty net that strips any `·`-specialty absent from the CV's skills (a
+  target role can reword the role part but never smuggle in invented tech).
+  Cover letters (`cover_letter.py`, `/letters/new`): pick a tracked application
+  (brings its cached JD extraction), tone + emphasize; small-model-safe pipeline
+  = one outline call (4 beats) then one draft call per beat, each fed only its
+  plan + the 1-2 word-overlap-relevant CV facts; assembled into an editable
+  textarea; export renders `typst/letter.typ` → .md + .pdf in data/letters/ and
+  links the PDF to the application. LLM inputs are always the digest/extraction,
+  never raw documents; a failed beat degrades to an empty paragraph, not a lost
+  letter.
 - **M5 — Tracker**
   SQLite DAO, dashboard with match scores, detail page, linking versions/letters,
   status history. (Built last so it can link artifacts from M3/M4; the schema exists

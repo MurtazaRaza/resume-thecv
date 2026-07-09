@@ -6,12 +6,14 @@
   <title>{% block title %}Resume the CV{% endblock %}</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/diff.js"></script>
 </head>
 <body>
   <nav class="topnav">
     <span class="brand">Resume the CV</span>
     <a href="/editor" {% if request.url.path == '/editor' %}class="active"{% endif %}>Editor</a>
     <a href="/tailor" {% if request.url.path == '/tailor' %}class="active"{% endif %}>Tailor</a>
+    <a href="/letters/new" {% if request.url.path == '/letters/new' %}class="active"{% endif %}>Letter</a>
     <a href="/import" {% if request.url.path == '/import' %}class="active"{% endif %}>Import</a>
     <span class="nav-spacer"></span>
     <span class="nav-status" title="Local LLM model">{{ model }}</span>

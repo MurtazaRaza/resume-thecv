@@ -49,8 +49,9 @@
   }
 
   // ---- live preview ----------------------------------------------------------
-  // The current tailoring choices, POSTed to /api/tailor/preview so the shown
-  // YAML is byte-identical to what a save would write (reuses apply_tailoring).
+  // The current tailoring choices, POSTed to /api/tailor/preview. accepted[i]
+  // carries the user's (possibly edited) rewrite text, so the diff and a save
+  // stay byte-identical (both go through apply_tailoring server-side).
   function tailoringChoices() {
     return {
       application_id: applicationId,
@@ -65,6 +66,7 @@
   }
 
   let previewTimer;
+  let lastTailoredYaml = "";  // kept for the "Full YAML" tab
   function refreshPreview() {
     if (!applicationId) return;
     $("#preview-pane").hidden = false;
@@ -78,15 +80,34 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(tailoringChoices()),
         });
-        const text = await resp.text();
-        if (!resp.ok) throw new Error(text);
-        $("#preview-yaml").value = text;
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || resp.statusText);
+        lastTailoredYaml = data.tailored_yaml;
+        $("#preview-yaml").value = lastTailoredYaml;
+        const diff = $("#preview-diff");
+        if (data.master_yaml === data.tailored_yaml) {
+          diff.innerHTML = '<p class="diff-empty">No changes yet — accept a ' +
+            "rewrite, swap the title, or add a gap skill to see the diff.</p>";
+        } else {
+          diff.innerHTML = CVDiff.unified(data.master_yaml, data.tailored_yaml,
+                                          { context: 2 });
+        }
         status.textContent = "";
       } catch (e) {
         status.textContent = "preview failed";
       }
     }, 200);
   }
+
+  // preview sub-tabs: unified diff vs. the whole tailored YAML
+  document.querySelectorAll("[data-ptab]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const which = btn.dataset.ptab;
+      document.querySelectorAll("[data-ptab]").forEach((b) =>
+        b.classList.toggle("active", b === btn));
+      $("#preview-diff").hidden = which !== "diff";
+      $("#preview-yaml").hidden = which !== "yaml";
+    }));
 
   function spinner(label) {
     return '<span class="spinner" style="border-color:#999;border-top-color:transparent"></span> ' + label;
@@ -248,12 +269,14 @@
           " rather than invent experience)" : " — no bullets relate to the missing keywords") +
         ".</p>";
     } else {
+      // remember the model's untouched rewrite so "dirty" = user changed it
+      suggestions.forEach((s) => { if (s.suggested == null) s.suggested = s.rewrite; });
       box.innerHTML = suggestions.map((s, i) =>
         '<div class="sug-card" data-i="' + i + '">' +
         '<div class="sug-meta"><span class="chip miss">' + escapeHtml(s.keyword) +
         '</span><span class="dropnote">' + escapeHtml(s.role) + "</span></div>" +
-        '<div class="sug-texts"><del>' + escapeHtml(s.original) + "</del>" +
-        "<ins>" + escapeHtml(s.rewrite) + "</ins></div>" +
+        '<div class="sug-texts">' + CVDiff.words(s.original, s.rewrite) + "</div>" +
+        '<textarea class="diff-edit" rows="2">' + escapeHtml(s.rewrite) + "</textarea>" +
         '<div class="sug-actions">' +
         '<button type="button" class="btn btn-sm sug-accept">✓ Accept</button>' +
         '<button type="button" class="btn btn-sm sug-reject">✕ Reject</button>' +
@@ -270,6 +293,8 @@
     if (!card) return;
     const i = +card.dataset.i;
     if (e.target.classList.contains("sug-accept")) {
+      // accept the *edited* text — the textarea is the source of truth
+      suggestions[i].rewrite = $(".diff-edit", card).value.trim();
       accepted.add(i);
       card.classList.add("accepted");
       card.classList.remove("rejected");
@@ -281,6 +306,20 @@
       return;
     }
     refreshPreview();
+  });
+
+  // live word-diff as the user tweaks a rewrite; re-preview if already accepted
+  $("#suggestions").addEventListener("input", (e) => {
+    if (!e.target.classList.contains("diff-edit")) return;
+    const card = e.target.closest(".sug-card");
+    const i = +card.dataset.i;
+    const edited = e.target.value;
+    e.target.classList.toggle("dirty", edited.trim() !== suggestions[i].suggested);
+    $(".sug-texts", card).innerHTML = CVDiff.words(suggestions[i].original, edited);
+    if (accepted.has(i)) {
+      suggestions[i].rewrite = edited.trim();
+      refreshPreview();
+    }
   });
 
   // any tailoring toggle (title swap, gap-skill checkboxes) refreshes the preview

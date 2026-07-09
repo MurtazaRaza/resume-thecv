@@ -148,10 +148,11 @@ button { font: inherit; cursor: pointer; }
 .grammar-bar select { padding: 5px 8px; border: 1px solid var(--border);
   border-radius: 6px; font: inherit; }
 .gissue { padding: 8px 11px; margin-bottom: 6px; border: 1px solid var(--border);
-  border-radius: 6px; font-size: 13px; background: #fff; }
-.gissue del { color: var(--danger); text-decoration: line-through; }
-.gissue ins { color: #16a34a; text-decoration: none; }
+  border-radius: 6px; font-size: 13px; background: #fff;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gissue .wdiff { flex: 1; min-width: 0; }
 .gissue .issue-tag { color: var(--muted); font-size: 11px; }
+.gissue.applied { border-color: #86efac; background: #f0fdf4; }
 
 /* --- M3: job tailoring --- */
 .tailor-wrap { max-width: 1280px; margin: 0 auto; }
@@ -230,3 +231,50 @@ button { font: inherit; cursor: pointer; }
 .opt-suggestion .txt { margin-bottom: 7px; }
 .opt-pop .close-x { position: absolute; top: 8px; right: 10px; }
 .opt-pop .none { color: #16a34a; }
+
+/* --- shared diff rendering (diff.js: word-level + unified) ----------------- */
+/* word-level inline diff, reused by bullets / grammar / summary / tailor */
+.wdiff del { color: var(--danger); text-decoration: line-through;
+  background: #fee2e2; border-radius: 2px; padding: 0 1px; }
+.wdiff ins { color: #166534; text-decoration: none;
+  background: #dcfce7; border-radius: 2px; padding: 0 1px; }
+
+/* editable target: model rewrite lands here, user tweaks before accepting */
+.diff-edit {
+  width: 100%; margin-top: 6px; font: inherit; line-height: 1.45;
+  padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; color: var(--text); resize: vertical; min-height: 2.6em;
+}
+.diff-edit.dirty { border-color: var(--accent); background: #f5f8ff; }
+
+/* unified (git-style) whole-CV diff */
+.udiff { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px;
+  line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  border: 1px solid var(--border); border-radius: 6px; background: #fafbfc;
+  overflow-x: auto; }
+.udiff .dline { padding: 0 8px; display: block; }
+.udiff .sgn { display: inline-block; width: 1.1em; color: var(--muted);
+  user-select: none; }
+.udiff .del, .udiff .del-word { background: #fef1f1; color: #7f1d1d; }
+.udiff .ins, .udiff .ins-word { background: #f0fdf4; color: #14532d; }
+.udiff .del .sgn, .udiff .del-word .sgn { color: var(--danger); }
+.udiff .ins .sgn, .udiff .ins-word .sgn { color: #16a34a; }
+.udiff .gap { color: var(--muted); text-align: center; background: #f3f4f6;
+  border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); }
+.udiff .del-word del, .udiff .ins-word ins { text-decoration: none;
+  font-weight: 600; border-radius: 2px; padding: 0 1px; }
+.udiff .del-word del { background: #fecaca; }
+.udiff .ins-word ins { background: #bbf7d0; }
+.diff-empty { color: var(--muted); font-size: 13px; padding: 10px; }
+
+/* --- M4: summary/headline generator + cover letters ----------------------- */
+.field-with-btn { display: flex; align-items: center; gap: 4px; }
+.field-with-btn input { flex: 1; }
+.variant-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.variant { border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+.variant .txt { margin-bottom: 8px; line-height: 1.45; }
+.beat-list { margin: 4px 0 12px; padding-left: 20px; }
+.beat-list li { margin-bottom: 6px; color: var(--muted); font-size: 13px; }
+.beat-list strong { color: var(--text); text-transform: capitalize; }
+#letter-body { width: 100%; font-family: inherit; font-size: 14px; line-height: 1.5;
+  padding: 12px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }

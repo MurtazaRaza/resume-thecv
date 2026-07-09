@@ -195,6 +195,86 @@ Bullet: Wrote unit tests for the payments API
 Example output:
 {"rewrite": null}"""
 
+# --- §5.3 summary + headline generator ------------------------------------------
+
+SUMMARY_VARIANTS = """You write resume professional-summary lines from a candidate
+digest. Respond with ONLY valid JSON: {"variants": [str, str, str]}
+Exactly 3 variants. Each is 2-3 sentences, third person with NO first-person
+pronouns (no "I", "my", "me"), plain professional English. State role, years of
+experience, strongest skills, and one signature strength. If a target role is
+given, angle the wording toward it — but only using facts in the digest.
+Banned words (never use): passionate, dynamic, results-driven, motivated,
+detail-oriented, team player, hardworking, go-getter, synergy, proven track
+record, thought leader, ninja, guru, rockstar, seasoned, wheelhouse.
+Never invent employers, numbers, titles, or skills not in the digest.
+
+Example input:
+Years: 6. Current title: Backend Engineer. Top skills: Python, Go, PostgreSQL,
+Kubernetes. Signature achievements: Cut API latency by 40%; Led migration of 12
+services to AWS. Target role: Senior Platform Engineer
+Example output:
+{"variants": [
+ "Backend engineer with 6 years building high-throughput services in Python and Go. Cut API latency 40% and led the migration of 12 services to AWS, with deep PostgreSQL and Kubernetes experience.",
+ "Platform-focused backend engineer with 6 years of experience owning reliability and infrastructure. Known for cutting API latency 40% and moving 12 services to AWS on Kubernetes.",
+ "Engineer with 6 years across Python, Go, and Kubernetes who ships reliable backends. Delivered a 40% latency reduction and a 12-service AWS migration."]}"""
+
+HEADLINE_VARIANTS = """You write resume headline / title lines from a candidate
+digest. Respond with ONLY valid JSON: {"headlines": [str, str, str]}
+Exactly 3 options for the CV title line under the name. Each is a short plain-text
+line naming a role plus 2-3 core specialties, separated by " · " (middle dot).
+Max ~9 words. NO pipes or emojis — an ATS must parse it as plain text.
+The specialties MUST be copied verbatim from the digest's "Top skills" list.
+NEVER add a technology, tool, or skill that is not in that list, even if the
+target role suggests it — a target role can only reorder or reword the ROLE
+part, never introduce new skills. If a skill is not in the digest, do not use it.
+
+Example input:
+Years: 6. Current title: Backend Engineer. Top skills: Python, Go, PostgreSQL,
+Kubernetes. Target role: Senior Platform Engineer
+Example output:
+{"headlines": [
+ "Senior Platform Engineer · Python · Kubernetes",
+ "Backend Engineer · Go · PostgreSQL",
+ "Platform Engineer · Python · PostgreSQL · Kubernetes"]}"""
+
+# --- §5.5 cover letter pipeline -------------------------------------------------
+
+LETTER_OUTLINE = """You outline a cover letter as 4 short beats. Respond with ONLY
+valid JSON: {"beats": [{"name": "hook", "point": str},
+{"name": "fit1", "point": str}, {"name": "fit2", "point": str},
+{"name": "close", "point": str}]}
+Each "point" is ONE sentence stating what that beat should say — a plan, not the
+prose. hook = why this candidate + this role; fit1 and fit2 = map a specific
+candidate achievement to a top job requirement (name both); close = enthusiasm +
+call to action. Use only the candidate digest and job requirements given. Never
+invent achievements, employers, or numbers.
+
+Example input:
+Role: Senior Backend Engineer at Acme. Top requirements: Go microservices,
+PostgreSQL, CI/CD. Candidate digest: 6 yrs backend; cut API latency 40%; led
+12-service AWS migration; strong in Python, Go, PostgreSQL, Kubernetes.
+Example output:
+{"beats": [
+ {"name": "hook", "point": "Open with genuine interest in Acme's backend role and 6 years of relevant experience."},
+ {"name": "fit1", "point": "Connect the 12-service AWS migration to Acme's need for someone who owns Go microservices at scale."},
+ {"name": "fit2", "point": "Connect the 40% API latency reduction and PostgreSQL depth to the data-layer and CI/CD requirements."},
+ {"name": "close", "point": "Express eagerness to contribute and invite a conversation."}]}"""
+
+LETTER_BEAT = """You write ONE paragraph of a cover letter from a single beat
+instruction and the relevant candidate facts. Respond with ONLY valid JSON:
+{"paragraph": str}
+Write 2-4 sentences of natural, professional prose in the first person ("I").
+Match the requested tone. Use ONLY the facts provided — never invent employers,
+numbers, achievements, or skills. Do not add a greeting or sign-off; just the
+paragraph. No clichés (passionate, results-driven, team player, dynamic).
+
+Example input:
+Tone: professional
+Beat: Connect the 40% API latency reduction to the data-layer requirement.
+Relevant facts: Cut API latency by 40% by tuning PostgreSQL queries and caching.
+Example output:
+{"paragraph": "Your emphasis on a reliable data layer maps directly to my recent work: I cut API latency by 40% by tuning PostgreSQL queries and introducing a caching layer. That experience has made me comfortable owning performance and correctness across a service's data path."}"""
+
 # --- §5.4 LLM grammar pass ----------------------------------------------------
 
 GRAMMAR = """You proofread resume text. Report grammar, spelling, and punctuation

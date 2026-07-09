@@ -116,17 +116,22 @@
 
   </div><!-- /.tailor-steps -->
 
-  <!-- live preview: the tailored CV as it would be saved -->
+  <!-- live preview: what a save would change, master vs tailored -->
   <div class="pane preview-pane" id="preview-pane" hidden>
-    <div class="pane-head"><strong>Live preview</strong>
+    <div class="pane-head"><strong>Live diff</strong>
+      <div class="tabs" style="margin-left:12px">
+        <button type="button" class="tab active" data-ptab="diff">Changes</button>
+        <button type="button" class="tab" data-ptab="yaml">Full YAML</button>
+      </div>
       <span class="nav-spacer" style="flex:1"></span>
       <span id="preview-status" class="nav-status"></span>
     </div>
     <div class="pane-body">
-      <p class="dropnote">The tailored CV as it would be saved — updates as you
-        toggle the title swap, accept rewrites, or add gap skills. Your master
-        CV is untouched until you save.</p>
-      <textarea class="yaml" id="preview-yaml" spellcheck="false" readonly></textarea>
+      <p class="dropnote">Every change a save would make to your CV — updates as
+        you toggle the title swap, accept rewrites, or add gap skills. Your
+        master CV is untouched until you save.</p>
+      <div id="preview-diff"></div>
+      <textarea class="yaml" id="preview-yaml" spellcheck="false" readonly hidden></textarea>
     </div>
   </div>
 

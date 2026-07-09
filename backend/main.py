@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from backend import config
-from backend.core import (analyzer, cv_model, importer, optimizer, render,
-                          tailor, tracker)
+from backend.core import (analyzer, cover_letter, cv_model, importer, optimizer,
+                          render, summary, tailor, tracker)
 from backend.llm.provider import LLMError, get_provider
 
 app = FastAPI(title="Resume the CV")
@@ -150,6 +150,33 @@ async def optimize_bullet(request: Request):
         return JSONResponse({"error": str(e)}, status_code=502)
 
 
+# --- summary + headline generator (M4, §5.3) ------------------------------------
+
+@app.post("/api/summary/generate")
+async def summary_generate(request: Request):
+    """3 summary variants from a deterministic digest of the posted CV state.
+    Body may carry the live editor CV so unsaved edits feed the digest."""
+    data = await request.json()
+    cv = cv_model.normalize(data.get("cv") or cv_model.load_cv())
+    try:
+        return summary.generate_summaries(
+            cv, get_provider(), target_title=str(data.get("target_title") or ""))
+    except LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+
+@app.post("/api/headline/generate")
+async def headline_generate(request: Request):
+    """3 plain-text headline options for basics.title (same digest, tiny call)."""
+    data = await request.json()
+    cv = cv_model.normalize(data.get("cv") or cv_model.load_cv())
+    try:
+        return summary.generate_headlines(
+            cv, get_provider(), target_title=str(data.get("target_title") or ""))
+    except LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+
 # --- job tailoring (M3) ----------------------------------------------------------
 
 @app.get("/tailor")
@@ -192,20 +219,23 @@ def tailor_load_application(app_id: int):
 
 @app.post("/api/tailor/preview")
 async def tailor_preview(request: Request):
-    """Server-side render of the tailored CV as YAML for the live side-by-side
-    preview. Reuses apply_tailoring + dump_yaml so the preview is byte-identical
-    to what a save would write. No LLM, no typst — just a dict transform."""
+    """Server-side render of the tailored CV for the live diff preview. Returns
+    both the master and tailored YAML so the client can show a unified diff of
+    exactly what a save would change. Reuses apply_tailoring + dump_yaml so the
+    tailored side is byte-identical to a saved snapshot. No LLM, no typst."""
     data = await request.json()
     entry, extraction, err = _tailoring_context(data.get("application_id"))
     if err:
         return err
+    master = cv_model.load_cv()
     tailored = tailor.apply_tailoring(
-        cv_model.load_cv(), extraction,
+        master, extraction,
         accepted=data.get("accepted") or [],
         add_skills=data.get("add_skills") or [],
         skills_group=str(data.get("skills_group") or ""),
         new_title=str(data.get("new_title") or ""))
-    return PlainTextResponse(cv_model.dump_yaml(tailored))
+    return {"master_yaml": cv_model.dump_yaml(master),
+            "tailored_yaml": cv_model.dump_yaml(tailored)}
 
 
 @app.post("/api/tailor/extract")
@@ -272,6 +302,67 @@ async def tailor_apply(request: Request):
     rel = str(path.relative_to(config.PROJECT_ROOT))
     tracker.update_application(entry["id"], cv_version_path=rel, match_score=after)
     return {"snapshot": rel, "coverage_before": before, "coverage_after": after}
+
+
+# --- cover letters (M4, §5.5) ---------------------------------------------------
+
+@app.get("/letters/new")
+def letters_new_page(request: Request):
+    cv = cv_model.load_cv()
+    # only applications with a cached JD extraction can seed a letter's requirements
+    apps = [a for a in tracker.list_applications()
+            if (tracker.get_application(a["id"]) or {}).get("jd_extraction")]
+    return templates.TemplateResponse("letters.html", page_ctx(
+        request, cv_empty=cv_model.cv_is_empty(cv), applications=apps,
+        ollama_ok=get_provider().is_up() if config.LLM_PROVIDER == "ollama" else True))
+
+
+@app.post("/api/letters/generate")
+async def letters_generate(request: Request):
+    data = await request.json()
+    entry, extraction, err = _tailoring_context(data.get("application_id"))
+    if err:
+        return err
+    cv = cv_model.load_cv()
+    try:
+        result = cover_letter.generate(
+            cv, extraction, entry["company"], entry["role"], get_provider(),
+            tone=str(data.get("tone") or "professional"),
+            emphasize=str(data.get("emphasize") or ""))
+    except LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    result["company"] = entry["company"]
+    return result
+
+
+@app.post("/api/letters/export")
+async def letters_export(request: Request):
+    """Save the (edited) letter as .md + .pdf in data/letters/, linked to the
+    application. Body: {application_id, body}."""
+    data = await request.json()
+    entry, _extraction, err = _tailoring_context(data.get("application_id"))
+    if err:
+        return err
+    body = (data.get("body") or "").strip()
+    if not body:
+        return JSONResponse({"error": "Nothing to export — the letter is empty."},
+                            status_code=422)
+    cv = cv_model.load_cv()
+    md_path = cover_letter.save_letter(body, entry["company"])
+    try:
+        pdf_tmp = render.render_letter_pdf(cv, body, entry["company"])
+    except render.RenderError as e:
+        # still keep the .md; the PDF is optional if typst is missing
+        rel_md = str(md_path.relative_to(config.PROJECT_ROOT))
+        tracker.update_application(entry["id"], cover_letter_path=rel_md)
+        return JSONResponse({"error": str(e), "markdown": rel_md}, status_code=500)
+    pdf_path = md_path.with_suffix(".pdf")
+    shutil.copy(pdf_tmp, pdf_path)
+    rel_pdf = str(pdf_path.relative_to(config.PROJECT_ROOT))
+    tracker.update_application(entry["id"], cover_letter_path=rel_pdf)
+    stamp = int(pdf_path.stat().st_mtime)
+    return {"markdown": str(md_path.relative_to(config.PROJECT_ROOT)),
+            "pdf": rel_pdf, "pdf_url": f"/out/letter.pdf?v={stamp}"}
 
 
 # --- import --------------------------------------------------------------------

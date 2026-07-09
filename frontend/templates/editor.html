@@ -102,7 +102,12 @@
         <legend>Basics</legend>
         <div class="row">
           <label>Name<input type="text" data-f="name" value="{{ cv.basics.name }}"></label>
-          <label>Title / headline<input type="text" data-f="title" value="{{ cv.basics.title }}"></label>
+          <label>Title / headline
+            <span class="field-with-btn">
+              <input type="text" data-f="title" value="{{ cv.basics.title }}">
+              <button type="button" class="btn-ghost gen-headline" title="Suggest headline options (local LLM)">✨</button>
+            </span>
+          </label>
         </div>
         <div class="row">
           <label>Email<input type="text" data-f="email" value="{{ cv.basics.email }}"></label>
@@ -116,6 +121,11 @@
       <fieldset class="section" id="sec-summary">
         <legend>Summary</legend>
         <textarea data-f="summary" rows="4" placeholder="2–3 sentence professional summary…">{{ cv.summary }}</textarea>
+        <div class="actionbar">
+          <button type="button" class="btn btn-sm" id="gen-summary">✨ Generate summary</button>
+          <span id="gen-summary-status" class="dropnote"></span>
+        </div>
+        <div id="summary-variants" class="variant-list" hidden></div>
       </fieldset>
 
       <fieldset class="section">
