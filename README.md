@@ -1,6 +1,8 @@
 # Resume the CV
 
-Resume the CV is a local first resume workspace. It helps you import, edit, analyze, and tailor a resume for specific jobs while keeping you in control of every final change.
+> Local-first resume workspace to import, edit, analyze, and tailor your CV for jobs — with ATS-friendly PDF output and reviewable LLM suggestions.
+
+Resume the CV helps you import, edit, analyze, and tailor a resume for specific jobs while keeping you in control of every final change.
 
 The app is built for a practical workflow:
 
@@ -38,7 +40,7 @@ cv-enhancer/
 │   ├── main.py            # FastAPI routes and app wiring
 │   ├── config.py          # Paths, model, provider, runtime config
 │   ├── core/              # CV model, analyzer, tailoring, tracker, rendering
-│   └── llm/               # provider abstraction + prompts
+│   └── llm/               # provider abstraction, ollama/gemini backends, prompts
 ├── frontend/
 │   ├── templates/         # Server-rendered HTML
 │   └── static/            # CSS and JS
@@ -113,9 +115,12 @@ Or run directly:
 
 You can override defaults from `backend/config.py`:
 
-- `CVE_PROVIDER` (default: `ollama`)
+- `CVE_PROVIDER` (default: `ollama`) — `ollama`, `gemini`, or `anthropic` (stub)
 - `CVE_OLLAMA_URL` (default: `http://localhost:11434`)
-- `CVE_MODEL` (default: `qwen2.5:3b-instruct`)
+- `CVE_MODEL` (default: `qwen2.5:3b-instruct`) — Ollama model name
+- `GEMINI_API_KEY` — required when `CVE_PROVIDER=gemini`
+- `CVE_GEMINI_MODEL` (default: `gemini-2.5-flash`)
+- `CVE_TASK_MODEL_<task>` — optional per-task model override (see below)
 
 Example:
 
@@ -123,6 +128,66 @@ Example:
 export CVE_MODEL=llama3.2:3b
 ./run.sh
 ```
+
+## LLM Providers
+
+All LLM features go through a small provider abstraction in `backend/llm/`. Prompts live in `backend/llm/prompts.py` and are shared across providers — switching backends is a config change, not a rewrite.
+
+### Built-in providers
+
+| Provider | `CVE_PROVIDER` | Notes |
+|----------|----------------|-------|
+| Ollama (default) | `ollama` | Local, free. Requires `ollama serve` and a pulled model. |
+| Gemini | `gemini` | Google Generative Language API. Requires `GEMINI_API_KEY`. |
+| Anthropic | `anthropic` | Stub only — raises `NotImplementedError` until implemented. |
+
+**Use Gemini instead of Ollama**
+
+1. Copy `.env.example` to `.env` if you have not already.
+2. Set your API key and switch the provider:
+
+   ```bash
+   CVE_PROVIDER=gemini
+   GEMINI_API_KEY=your-key-here
+   CVE_GEMINI_MODEL=gemini-2.5-flash
+   ```
+
+3. Restart the app. The editor health indicator checks whether the active provider is reachable.
+
+**Per-task model overrides**
+
+Route specific features to a different model without changing code. The env var suffix must match the task name passed to `get_provider()` in `backend/main.py`:
+
+```bash
+# Use a stronger model only for job tailoring suggestions
+CVE_TASK_MODEL_tailor_suggest=gemini-2.5-pro
+```
+
+Available task names: `import`, `bullet_optimize`, `grammar`, `letters`, `jd_extract`, `tailor_suggest`, `summary`, `headline`.
+
+### Add a new provider (e.g. OpenAI, Anthropic)
+
+1. **Subclass `LLMProvider`** in a new file under `backend/llm/` (see `ollama.py` or `gemini.py` for reference). Implement:
+   - `complete(system, user, *, json_mode=False, temperature=0.3, max_tokens=800) -> str` — return the model's text response.
+   - `is_up() -> bool` (optional but recommended) — lightweight health check used by the UI.
+
+   `complete_json()` is inherited from the base class; it calls `complete()` with `json_mode=True` and parses JSON, retrying once on failure.
+
+2. **Add config** in `backend/config.py` for any API keys, base URLs, or default model names your provider needs.
+
+3. **Wire it in `get_provider()`** in `backend/llm/provider.py`:
+
+   ```python
+   if config.LLM_PROVIDER == "your_provider":
+       from backend.llm.your_module import YourProvider
+       return YourProvider(model=model)
+   ```
+
+4. **Document env vars** in `.env.example` (e.g. `CVE_PROVIDER=your_provider`, API key, model name).
+
+5. **Handle errors with `LLMError`** — raise `LLMError("friendly message")` for unreachable services or bad responses so routes surface a clear error instead of crashing.
+
+No changes are needed in feature code (`tailor.py`, `optimizer.py`, etc.) as long as your provider implements the `LLMProvider` interface. Prompts stay in `prompts.py`.
 
 ## Core Workflow
 
