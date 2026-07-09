@@ -149,7 +149,8 @@ def artifact_file(kind: str, filename: str):
 async def analyze_cv(request: Request):
     """Rules engine on the *current* editor state (body = CV JSON)."""
     cv = cv_model.normalize(await request.json())
-    return {"findings": analyzer.analyze(cv)}
+    findings = analyzer.analyze(cv)
+    return {"findings": findings, "ats": analyzer.ats_score(cv, findings)}
 
 
 @app.post("/api/analyze/grammar")

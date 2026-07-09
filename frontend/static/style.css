@@ -143,6 +143,31 @@ button { font: inherit; cursor: pointer; }
 .finding.clickable:hover { background: var(--bg); }
 .checks-empty { color: #16a34a; padding: 14px; text-align: center; }
 
+/* ATS-friendliness score card */
+.ats-card { border: 1px solid var(--border); border-radius: 8px; padding: 13px 14px;
+  margin-bottom: 14px; background: #fff; border-left-width: 4px; }
+.ats-card.good { border-left-color: #16a34a; }
+.ats-card.mid  { border-left-color: #d97706; }
+.ats-card.low  { border-left-color: var(--danger); }
+.ats-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ats-num { font-size: 34px; font-weight: 800; line-height: 1; }
+.ats-card.good .ats-num { color: #16a34a; }
+.ats-card.mid  .ats-num { color: #d97706; }
+.ats-card.low  .ats-num { color: var(--danger); }
+.ats-pct { font-size: 15px; font-weight: 700; margin-left: 1px; }
+.ats-title { font-weight: 700; font-size: 14px; display: flex; flex-direction: column; }
+.ats-sub { font-weight: 400; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.ats-bars { display: flex; flex-direction: column; gap: 6px; }
+.ats-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ats-cat { width: 78px; flex-shrink: 0; color: var(--muted); }
+.ats-track { flex: 1; height: 7px; background: var(--bg); border-radius: 4px;
+  overflow: hidden; }
+.ats-fill { display: block; height: 100%; border-radius: 4px; background: #16a34a; }
+.ats-card.mid .ats-fill { background: #d97706; }
+.ats-card.low .ats-fill { background: var(--danger); }
+.ats-pts { width: 40px; flex-shrink: 0; text-align: right; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+
 .grammar-bar { display: flex; gap: 8px; align-items: center; margin: 16px 0 10px;
   padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .grammar-bar select { padding: 5px 8px; border: 1px solid var(--border);

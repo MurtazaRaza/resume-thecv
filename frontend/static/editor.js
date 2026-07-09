@@ -222,11 +222,40 @@
       });
       const data = await resp.json();
       if (seq !== analysisSeq) return; // a newer run superseded this one
+      renderAtsScore(data.ats);
       renderFindings(data.findings || []);
     } catch (e) {
       if (seq === analysisSeq) box.innerHTML =
         '<p class="dropnote">Checks failed: ' + escapeHtml(e.message) + "</p>";
     }
+  }
+
+  function renderAtsScore(ats) {
+    const card = $("#ats-score");
+    if (!card) return;
+    if (!ats || typeof ats.score !== "number") {
+      card.hidden = true;
+      return;
+    }
+    const bars = (ats.breakdown || []).map((b) => {
+      const pct = Math.round((b.frac || 0) * 100);
+      return (
+        '<div class="ats-row">' +
+        '<span class="ats-cat">' + escapeHtml(b.label) + "</span>" +
+        '<span class="ats-track"><span class="ats-fill" style="width:' +
+        pct + '%"></span></span>' +
+        '<span class="ats-pts">' + b.earned + "/" + b.max + "</span></div>"
+      );
+    }).join("");
+    card.className = "ats-card " + ats.band;
+    card.innerHTML =
+      '<div class="ats-head">' +
+      '<div class="ats-num">' + ats.score + '<span class="ats-pct">%</span></div>' +
+      '<div class="ats-title">ATS-friendliness' +
+      '<span class="ats-sub">parse-ability &amp; resume hygiene</span></div>' +
+      "</div>" +
+      '<div class="ats-bars">' + bars + "</div>";
+    card.hidden = false;
   }
 
   function renderFindings(findings) {

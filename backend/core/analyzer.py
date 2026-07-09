@@ -255,6 +255,177 @@ def _check_bullet_quality(cv, add):
             bullet_ids=ids)
 
 
+# --- ATS score (deterministic, 0–100) ----------------------------------------
+#
+# A recruiter-side ATS does two things that a resume can help or hurt: parse the
+# document into clean fields, and match it against a role. We can't see the role
+# here, so this score measures *parse-ability and hygiene* only — the things
+# that make an ATS mangle or down-rank a resume regardless of the job. It is a
+# weighted rollup of six categories, each scored 0–1 by pure rules (no LLM), so
+# the same CV always yields the same number.
+
+ATS_WEIGHTS = {
+    "contact": 15,      # ATS needs to extract who you are and how to reach you
+    "parsing": 25,      # emoji/symbols, oversized skill lists, links → parse errors
+    "sections": 15,     # standard sections present and non-empty
+    "keywords": 20,     # quantified, skill-dense bullets are what matchers index
+    "formatting": 15,   # consistent dates/punctuation, sane bullet lengths
+    "hygiene": 10,      # tense, gaps, bias/age signals, overused words
+}
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _score_contact(cv) -> float:
+    b = cv["basics"]
+    pts = 0.0
+    if b["name"].strip():
+        pts += 0.30
+    if _EMAIL_RE.match(b["email"].strip()):
+        pts += 0.30
+    elif b["email"].strip():
+        pts += 0.10  # present but malformed — ATS may still choke on it
+    if b["phone"].strip():
+        pts += 0.20
+    if b["location"].strip():
+        pts += 0.10
+    if b["title"].strip():
+        pts += 0.10
+    return min(pts, 1.0)
+
+
+def _score_parsing(cv) -> float:
+    """1.0 = clean. Each hard parse hazard subtracts."""
+    full = _full_text(cv)
+    pts = 1.0
+    if _EMOJI_RE.findall(full):
+        pts -= 0.5  # emoji/symbols are the single worst offender for parsers
+    oversized = sum(1 for s in cv["skills"] if len(s["items"]) > 20)
+    pts -= min(oversized, 2) * 0.2
+    # bare/untitled links read as noise; a labelled link parses cleanly
+    bad_links = sum(1 for l in cv["basics"].get("links", [])
+                    if isinstance(l, dict) and l.get("url")
+                    and not str(l.get("label", "")).strip())
+    if bad_links:
+        pts -= 0.15
+    return max(pts, 0.0)
+
+
+def _score_sections(cv) -> float:
+    have = 0
+    checks = [
+        bool(cv["summary"].strip()),
+        bool(cv["experience"]),
+        bool(cv["education"]),
+        bool(cv["skills"]),
+    ]
+    have = sum(1 for c in checks if c)
+    return have / len(checks)
+
+
+def _score_keywords(cv) -> float:
+    """Reward quantified, weakly-flagged-free bullets and a real skills section."""
+    bullets = [b["text"] for _, b in _all_bullets(cv) if b["text"].strip()]
+    if not bullets:
+        return 0.0 if not cv["skills"] else 0.3
+    flagged = 0
+    quantified = 0
+    for t in bullets:
+        codes = {c["code"] for c in optimizer.bullet_checks(t)}
+        if codes & {"no_metric", "filler", "weak_start"}:
+            flagged += 1
+        if not (codes & {"no_metric"}):
+            quantified += 1
+    clean_ratio = 1 - flagged / len(bullets)
+    quant_ratio = quantified / len(bullets)
+    skills_pts = 1.0 if any(s["items"] for s in cv["skills"]) else 0.0
+    return 0.45 * clean_ratio + 0.35 * quant_ratio + 0.20 * skills_pts
+
+
+def _score_formatting(cv) -> float:
+    pts = 1.0
+    texts = [b["text"] for _, b in _all_bullets(cv) if b["text"].strip()]
+    if texts:
+        dotted = sum(1 for t in texts if t.endswith("."))
+        if 0 < dotted < len(texts):
+            pts -= 0.25  # mixed bullet punctuation
+        lens = [len(t.split()) for t in texts]
+        avg = sum(lens) / len(lens)
+        if avg > 24:
+            pts -= 0.25  # dense, hard-to-parse bullets
+    fmts = set()
+    for e in cv["experience"] + cv["education"]:
+        for d in (e.get("start"), e.get("end")):
+            if d:
+                fmts.add("YYYY-MM" if "-" in str(d) else "YYYY")
+    if len(fmts) > 1:
+        pts -= 0.25  # mixed date formats confuse date extractors
+    return max(pts, 0.0)
+
+
+def _score_hygiene(cv, findings: List[Finding]) -> float:
+    """Deduct for the non-parse issues the rules engine already surfaced."""
+    pts = 1.0
+    cats = Counter(f["category"] for f in findings
+                   if f["severity"] in ("error", "warn"))
+    for cat in ("tense", "dates", "bias", "repetition"):
+        if cats.get(cat):
+            pts -= 0.25
+    return max(pts, 0.0)
+
+
+def ats_score(cv: Dict[str, Any],
+              findings: Optional[List[Finding]] = None) -> Dict[str, Any]:
+    """0–100 ATS-friendliness score with a per-category breakdown.
+
+    Measures parse-ability and hygiene, not fit to a specific job (no JD here).
+    `findings` is reused if the caller already ran analyze(); otherwise computed.
+    """
+    if findings is None:
+        findings = analyze(cv)
+
+    parts = {
+        "contact": _score_contact(cv),
+        "parsing": _score_parsing(cv),
+        "sections": _score_sections(cv),
+        "keywords": _score_keywords(cv),
+        "formatting": _score_formatting(cv),
+        "hygiene": _score_hygiene(cv, findings),
+    }
+
+    # Parsing/formatting/hygiene reward the *absence* of problems, so an empty
+    # CV would earn them for free. Scale them by how much content exists, so a
+    # blank resume can't score well on "nothing to complain about".
+    has_bullets = any(b["text"].strip() for _, b in _all_bullets(cv))
+    if not has_bullets:
+        for k in ("parsing", "formatting", "hygiene"):
+            parts[k] *= 0.3
+
+    total_weight = sum(ATS_WEIGHTS.values())
+    breakdown = []
+    weighted = 0.0
+    for key, weight in ATS_WEIGHTS.items():
+        frac = max(0.0, min(parts[key], 1.0))
+        earned = frac * weight
+        weighted += earned
+        breakdown.append({
+            "key": key,
+            "label": key.capitalize(),
+            "earned": round(earned),
+            "max": weight,
+            "frac": round(frac, 3),
+        })
+
+    score = round(weighted / total_weight * 100)
+    if score >= 80:
+        band = "good"
+    elif score >= 60:
+        band = "mid"
+    else:
+        band = "low"
+    return {"score": score, "band": band, "breakdown": breakdown}
+
+
 def analyze(cv: Dict[str, Any]) -> List[Finding]:
     findings: List[Finding] = []
 
