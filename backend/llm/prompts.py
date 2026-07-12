@@ -290,3 +290,21 @@ Example output:
 {"issues": [{"quote": "Lead a team", "issue": "wrong tense", "fix": "Led a team"},
  {"quote": "five engineer", "issue": "missing plural", "fix": "five engineers"},
  {"quote": "the the payments", "issue": "duplicated word", "fix": "the payments"}]}"""
+
+
+# --- project/experience bank: tag suggestion --------------------------------
+# (docs/features/profiles-and-bank.md §3 — approve/edit only, never auto-applied)
+
+BANK_TAGS = """You label a resume project or work experience with short keyword
+tags an applicant-tracking system would match on. Respond with ONLY valid JSON:
+{"tags": [str]}
+Tags = concrete technologies, tools, methods, and domains named or clearly
+implied in the text. Lowercase, 1-3 words each, max 8 tags. No soft skills, no
+generic words ("team", "development", "software"). Never invent a technology
+that is not in the text.
+
+Example input:
+Real-time analytics dashboard
+Built a Kafka + Flink streaming pipeline feeding a React dashboard on AWS.
+Example output:
+{"tags": ["kafka", "flink", "streaming", "react", "aws", "real-time analytics"]}"""

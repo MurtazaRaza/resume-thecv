@@ -1,0 +1,30 @@
+{# One bank entry card. `entry` is a project (has .name) or experience (.company). #}
+<div class="bank-entry" data-id="{{ entry.id }}"
+     data-kind="{% if entry.company is defined %}experiences{% else %}projects{% endif %}">
+  <div class="bank-entry-head">
+    <div class="bank-entry-title">
+      {% if entry.company is defined %}
+        <strong>{{ entry.title or "—" }}</strong>
+        <span class="dropnote">{{ entry.company }}{% if entry.start %} · {{ entry.start }}–{{ entry.end or "present" }}{% endif %}</span>
+      {% else %}
+        <strong>{{ entry.name or "—" }}</strong>
+        {% if entry.url %}<a class="dropnote" href="{{ entry.url }}" target="_blank" rel="noopener">{{ entry.url }}</a>{% endif %}
+      {% endif %}
+    </div>
+    <div class="bank-entry-actions">
+      <button type="button" class="btn btn-ghost btn-sm bank-insert" title="Insert into your CV">↑ Insert</button>
+      <button type="button" class="btn btn-ghost btn-sm bank-edit" title="Edit">Edit</button>
+      <button type="button" class="btn btn-ghost btn-sm bank-delete" title="Delete">✕</button>
+    </div>
+  </div>
+  {% if entry.tags %}
+  <div class="bank-tags">
+    {% for t in entry.tags %}<span class="bank-tag">{{ t }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if entry.bullets %}
+  <ul class="bank-bullets">
+    {% for b in entry.bullets %}<li>{{ b.text }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</div>

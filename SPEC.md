@@ -23,7 +23,9 @@ abstraction so a cloud API (e.g. Claude Haiku) can be plugged in later.
 - Zero cloud dependency by default; zero cost to run.
 
 ### Non-Goals (for now)
-- Multi-user support, auth, hosting.
+- Auth and hosting. (Multiple local **profiles** — data partitions with no auth,
+  no network exposure — are now in scope; see the profiles & bank feature doc,
+  `docs/features/profiles-and-bank.md`, and §4.)
 - Visual/designer resume templates (conflicts with ATS goal).
 - Scraping job boards (JD is pasted in; URL fetch is a later nice-to-have).
 - .docx export (later nice-to-have via python-docx; docx *import* IS in scope, §4).
@@ -54,9 +56,11 @@ Fallback: already-installed `llama3.2:3b`. Model name is a config value, not har
   No node toolchain, no build step. htmx vendored locally (single file in `static/`).
 - **PDF rendering:** [Typst](https://typst.app) CLI (`brew install typst`), invoked via
   `subprocess`. Compiles in ~100 ms, single static binary, far lighter than LaTeX.
-- **Storage:**
-  - CV data: YAML files on disk (human-editable outside the app too).
-  - Tracker: SQLite (stdlib `sqlite3`, thin data-access layer — no ORM).
+- **Storage:** all per-person state lives under `data/profiles/<slug>/` (see §4).
+  - CV data & bank: YAML files on disk (human-editable outside the app too).
+  - Tracker: SQLite (stdlib `sqlite3`, thin data-access layer — no ORM), one db per profile.
+  - Active profile is resolved per request from the `cve_profile` cookie, so the
+    per-user paths are attributes of a resolved `Profile` rather than `config.py` constants.
 - **LLM:** Ollama HTTP API (`http://localhost:11434/api/chat`) with `format: "json"`
   for structured outputs. Talked to via `httpx`.
 
@@ -91,7 +95,9 @@ resume-the-cv/
 │       ├── interview.py      # questions, STAR stories, pitch (§5.7)      [M6]
 │       ├── importer.py       # PDF/DOCX/text → YAML onboarding (§4)
 │       ├── render.py         # typst compile, plain-text export
-│       └── tracker.py        # sqlite DAO (§5.6; schema exists from M1)
+│       ├── tracker.py        # sqlite DAO (§5.6; per-profile db_path)
+│       ├── profiles.py       # Profile dataclass + resolved paths + CRUD
+│       └── bank.py           # project/experience bank: CRUD, tag match, tag suggest
 ├── frontend/                 # ALL UI code (server-rendered, no build step)
 │   ├── templates/            # Jinja2: base, editor, import; tailor/tracker/letters later
 │   └── static/               # style.css, editor.js, vendor/htmx.min.js
@@ -99,16 +105,28 @@ resume-the-cv/
 │   ├── cv.typ                # ATS-safe resume template
 │   └── letter.typ            # cover letter template                      [M4]
 └── data/                     # personal data, gitignored
-    ├── cv.yaml               # canonical CV (single source of truth)
-    ├── versions/             # tailored snapshots + pre-import backups
-    ├── letters/              # generated cover letters (.md + .pdf)
-    ├── out/                  # compiled PDFs / .txt exports
-    └── tracker.db
+    └── profiles/             # one directory per person; active one from cve_profile cookie
+        └── <slug>/
+            ├── profile.yaml  # display name + created_at
+            ├── cv.yaml       # canonical CV for this profile (single source of truth)
+            ├── bank.yaml     # reusable tagged projects + experiences (§4)
+            ├── versions/     # tailored snapshots + pre-import backups
+            ├── letters/      # generated cover letters (.md + .pdf)
+            ├── out/          # compiled PDFs / .txt exports
+            └── tracker.db
 ```
+
+See `docs/features/profiles-and-bank.md` for the full profiles & bank feature spec.
 
 ---
 
-## 4. CV Data Model (`data/cv.yaml`)
+## 4. CV Data Model (`data/profiles/<slug>/cv.yaml`)
+
+Each profile owns its own `cv.yaml` (canonical CV) and `bank.yaml` (a reusable,
+keyword-tagged library of projects and experiences the tailor flow can suggest
+swapping in). The bank uses the same bullet schema and stable-id scheme as the CV;
+full details in `docs/features/profiles-and-bank.md`.
+
 
 Structured so every bullet is individually addressable (stable `id` = 6-char hash
 assigned on save). This is what makes per-bullet LLM ops, diffs, and version

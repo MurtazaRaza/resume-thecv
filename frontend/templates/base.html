@@ -24,8 +24,20 @@
     <a href="/editor" {% if request.url.path == '/editor' %}class="active"{% endif %}>Editor</a>
     <a href="/tailor" {% if request.url.path == '/tailor' %}class="active"{% endif %}>Tailor</a>
     <a href="/letters/new" {% if request.url.path == '/letters/new' %}class="active"{% endif %}>Letter</a>
+    <a href="/bank" {% if request.url.path == '/bank' %}class="active"{% endif %}>Bank</a>
     <a href="/import" {% if request.url.path == '/import' %}class="active"{% endif %}>Import</a>
     <span class="nav-spacer"></span>
+    {% if profiles %}
+    <label class="profile-switcher" title="Active profile — switch or add people">
+      <span class="profile-switcher-icon" aria-hidden="true">👤</span>
+      <select id="profile-select" aria-label="Active profile">
+        {% for p in profiles %}
+        <option value="{{ p.slug }}" {% if profile and p.slug == profile.slug %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+        <option value="__new__">+ New profile…</option>
+      </select>
+    </label>
+    {% endif %}
     <button type="button" id="theme-toggle" class="btn btn-ghost theme-toggle" aria-pressed="false" aria-label="Switch to dark mode" title="Dark mode">
       <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
       <span class="theme-icon theme-icon-moon" aria-hidden="true">☾</span>
@@ -40,6 +52,7 @@
   </main>
   <div id="toast" class="toast" hidden></div>
   <script src="/static/theme.js"></script>
+  <script src="/static/profile.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

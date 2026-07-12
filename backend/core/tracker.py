@@ -46,14 +46,14 @@ STATUSES = ["saved", "applied", "screening", "interview", "offer",
             "rejected", "withdrawn"]
 
 
-def connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path or config.TRACKER_DB)
+def connect(db_path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db(db_path: Optional[Path] = None) -> None:
-    (db_path or config.TRACKER_DB).parent.mkdir(parents=True, exist_ok=True)
+def init_db(db_path: Path) -> None:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
 
@@ -62,8 +62,8 @@ def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
-def list_applications() -> List[Dict[str, Any]]:
-    with connect() as conn:
+def list_applications(db_path: Path) -> List[Dict[str, Any]]:
+    with connect(db_path) as conn:
         rows = conn.execute(
             "SELECT id, company, role, url, status, match_score, applied_date, "
             "next_action, next_action_date, cv_version_path, cover_letter_path, "
@@ -71,16 +71,16 @@ def list_applications() -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def get_application(app_id: int) -> Optional[Dict[str, Any]]:
-    with connect() as conn:
+def get_application(db_path: Path, app_id: int) -> Optional[Dict[str, Any]]:
+    with connect(db_path) as conn:
         row = conn.execute("SELECT * FROM applications WHERE id = ?",
                            (app_id,)).fetchone()
     return dict(row) if row else None
 
 
-def create_application(company: str, role: str, url: str = "") -> int:
+def create_application(db_path: Path, company: str, role: str, url: str = "") -> int:
     now = _now()
-    with connect() as conn:
+    with connect(db_path) as conn:
         cur = conn.execute(
             "INSERT INTO applications (company, role, url, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?)", (company, role, url, now, now))
@@ -97,7 +97,7 @@ _UPDATABLE = {"company", "role", "url", "jd_text", "jd_extraction",
               "next_action", "next_action_date", "match_score", "interview_prep"}
 
 
-def update_application(app_id: int, **fields: Any) -> None:
+def update_application(db_path: Path, app_id: int, **fields: Any) -> None:
     bad = set(fields) - _UPDATABLE
     if bad:
         raise ValueError(f"Unknown application fields: {bad}")
@@ -105,19 +105,19 @@ def update_application(app_id: int, **fields: Any) -> None:
         return
     fields["updated_at"] = _now()
     cols = ", ".join(f"{k} = ?" for k in fields)
-    with connect() as conn:
+    with connect(db_path) as conn:
         conn.execute(f"UPDATE applications SET {cols} WHERE id = ?",
                      (*fields.values(), app_id))
 
 
-def set_status(app_id: int, status: str) -> None:
+def set_status(db_path: Path, app_id: int, status: str) -> None:
     """Transition an application's status and log it to status_history.
     No-op if the status is unchanged (avoids duplicate history rows). Stamps
     applied_date on the first move into 'applied' if not already set."""
     if status not in STATUSES:
         raise ValueError(f"Unknown status: {status}")
     now = _now()
-    with connect() as conn:
+    with connect(db_path) as conn:
         row = conn.execute(
             "SELECT status, applied_date FROM applications WHERE id = ?",
             (app_id,)).fetchone()
@@ -139,25 +139,25 @@ def set_status(app_id: int, status: str) -> None:
             "VALUES (?, ?, ?)", (app_id, status, now))
 
 
-def get_status_history(app_id: int) -> List[Dict[str, Any]]:
-    with connect() as conn:
+def get_status_history(db_path: Path, app_id: int) -> List[Dict[str, Any]]:
+    with connect(db_path) as conn:
         rows = conn.execute(
             "SELECT status, changed_at FROM status_history "
             "WHERE application_id = ? ORDER BY changed_at, id", (app_id,)).fetchall()
     return [dict(r) for r in rows]
 
 
-def delete_application(app_id: int) -> None:
-    with connect() as conn:
+def delete_application(db_path: Path, app_id: int) -> None:
+    with connect(db_path) as conn:
         conn.execute("DELETE FROM status_history WHERE application_id = ?",
                      (app_id,))
         conn.execute("DELETE FROM applications WHERE id = ?", (app_id,))
 
 
-def dashboard() -> Dict[str, Any]:
+def dashboard(db_path: Path) -> Dict[str, Any]:
     """Applications grouped by status (in workflow order) with per-group counts
     and today's date, so the template can flag overdue next_action_date rows."""
-    apps = list_applications()
+    apps = list_applications(db_path)
     today = datetime.date.today().isoformat()
     for a in apps:
         a["overdue"] = bool(a["next_action_date"]

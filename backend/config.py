@@ -15,11 +15,10 @@ TEMPLATES_DIR = FRONTEND_DIR / "templates"
 STATIC_DIR = FRONTEND_DIR / "static"
 TYPST_DIR = PROJECT_ROOT / "typst"
 DATA_DIR = PROJECT_ROOT / "data"
-CV_PATH = DATA_DIR / "cv.yaml"
-VERSIONS_DIR = DATA_DIR / "versions"
-LETTERS_DIR = DATA_DIR / "letters"
-OUT_DIR = DATA_DIR / "out"
-TRACKER_DB = DATA_DIR / "tracker.db"
+# Per-person state lives under data/profiles/<slug>/ and is resolved per request
+# from the cve_profile cookie (see core/profiles.py). The old module-level
+# CV_PATH/VERSIONS_DIR/OUT_DIR/TRACKER_DB constants are now Profile attributes.
+PROFILES_DIR = DATA_DIR / "profiles"
 
 # --- LLM -------------------------------------------------------------------
 LLM_PROVIDER = os.environ.get("CVE_PROVIDER", "ollama")  # ollama | anthropic | gemini
@@ -43,7 +42,7 @@ TASK_MODELS = {
     task: model
     for task in (
         "import", "bullet_optimize", "grammar", "letters", "jd_extract",
-        "tailor_suggest", "summary", "headline",
+        "tailor_suggest", "summary", "headline", "bank_tags",
     )
     if (model := os.environ.get(f"CVE_TASK_MODEL_{task}", "").strip())
 }

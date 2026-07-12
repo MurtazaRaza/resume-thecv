@@ -50,13 +50,13 @@ def build_render_data(cv: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
-def render_pdf(cv: Dict[str, Any], out_name: str = "cv") -> Path:
+def render_pdf(cv: Dict[str, Any], out_dir: Path, out_name: str = "cv") -> Path:
     if not config.TYPST_BIN:
         raise RenderError("Typst binary not found. Expected it in tools/typst "
                           "(or on PATH via `brew install typst`).")
-    config.OUT_DIR.mkdir(parents=True, exist_ok=True)
-    json_path = config.OUT_DIR / f"{out_name}.json"
-    pdf_path = config.OUT_DIR / f"{out_name}.pdf"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / f"{out_name}.json"
+    pdf_path = out_dir / f"{out_name}.pdf"
     json_path.write_text(json.dumps(build_render_data(cv), ensure_ascii=False))
 
     # --root = project root so the template can address /data/out/cv.json
@@ -71,8 +71,8 @@ def render_pdf(cv: Dict[str, Any], out_name: str = "cv") -> Path:
     return pdf_path
 
 
-def render_letter_pdf(cv: Dict[str, Any], body: str, company: str = "",
-                      out_name: str = "letter") -> Path:
+def render_letter_pdf(cv: Dict[str, Any], body: str, out_dir: Path,
+                      company: str = "", out_name: str = "letter") -> Path:
     """Render an assembled cover letter body to PDF via typst/letter.typ.
 
     The body is the user's (possibly edited) text; blank-line-separated blocks
@@ -92,9 +92,9 @@ def render_letter_pdf(cv: Dict[str, Any], body: str, company: str = "",
         "company": company,
         "paragraphs": paragraphs,
     }
-    config.OUT_DIR.mkdir(parents=True, exist_ok=True)
-    json_path = config.OUT_DIR / f"{out_name}.json"
-    pdf_path = config.OUT_DIR / f"{out_name}.pdf"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / f"{out_name}.json"
+    pdf_path = out_dir / f"{out_name}.pdf"
     json_path.write_text(json.dumps(letter, ensure_ascii=False))
     rel_json = "/" + str(json_path.relative_to(config.PROJECT_ROOT))
     cmd = [config.TYPST_BIN, "compile",
@@ -107,7 +107,7 @@ def render_letter_pdf(cv: Dict[str, Any], body: str, company: str = "",
     return pdf_path
 
 
-def render_txt(cv: Dict[str, Any], out_name: str = "cv") -> Path:
+def render_txt(cv: Dict[str, Any], out_dir: Path, out_name: str = "cv") -> Path:
     """Plain-text export for paste-into-form ATS portals."""
     d = build_render_data(cv)
     lines: List[str] = []
@@ -166,7 +166,7 @@ def render_txt(cv: Dict[str, Any], out_name: str = "cv") -> Path:
                 row += f" ({c['date']})"
             lines.append(row)
 
-    config.OUT_DIR.mkdir(parents=True, exist_ok=True)
-    txt_path = config.OUT_DIR / f"{out_name}.txt"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    txt_path = out_dir / f"{out_name}.txt"
     txt_path.write_text("\n".join(lines).strip() + "\n")
     return txt_path

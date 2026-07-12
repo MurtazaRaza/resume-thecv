@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Bank — Resume the CV{% endblock %}
+
+{% block content %}
+<div class="bank-wrap">
+
+  <div class="tracker-head">
+    <h1>Project &amp; experience bank</h1>
+    <div class="bank-head-actions">
+      <button type="button" class="btn" id="add-project-btn">+ Project</button>
+      <button type="button" class="btn" id="add-experience-btn">+ Experience</button>
+    </div>
+  </div>
+
+  <p class="dropnote bank-intro">A reusable, tag-based library of projects and past
+    roles for <b>{{ profile.name }}</b>. The tailor flow suggests the most relevant
+    ones for a job description; you can also insert any entry straight into your CV.</p>
+
+  {% if not ollama_ok %}
+  <div class="warnbox">⚠ Ollama isn't reachable — “Suggest tags” will be unavailable
+    until it's running. Everything else works.</div>
+  {% endif %}
+
+  <!-- editor form (hidden until add/edit) -->
+  <div class="pane" id="entry-form" hidden>
+    <div class="pane-head"><strong id="entry-form-title">New entry</strong></div>
+    <div class="pane-body">
+      <input type="hidden" id="ef-id">
+      <input type="hidden" id="ef-kind">
+      <div class="row" id="ef-project-fields">
+        <label>Name<input type="text" id="ef-name" placeholder="Analytics Dashboard"></label>
+        <label>URL (optional)<input type="text" id="ef-url" placeholder="https://…"></label>
+      </div>
+      <div class="row" id="ef-experience-fields" hidden>
+        <label>Company<input type="text" id="ef-company" placeholder="Acme Corp"></label>
+        <label>Title<input type="text" id="ef-title" placeholder="Backend Engineer"></label>
+        <label>Location<input type="text" id="ef-location" placeholder="Remote"></label>
+        <label>Start<input type="text" id="ef-start" placeholder="2022-01"></label>
+        <label>End<input type="text" id="ef-end" placeholder="2024-06 (blank = present)"></label>
+      </div>
+      <label class="bank-tags-label">Tags (comma-separated)
+        <div class="bank-tags-row">
+          <input type="text" id="ef-tags" placeholder="python, fastapi, llm">
+          <button type="button" class="btn btn-ghost" id="ef-suggest-tags">✨ Suggest</button>
+        </div>
+      </label>
+      <label>Bullets (one per line)
+        <textarea id="ef-bullets" rows="5" placeholder="Built a Kafka streaming pipeline…"></textarea>
+      </label>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="ef-save">Save</button>
+        <button type="button" class="btn" id="ef-cancel">Cancel</button>
+        <span id="ef-status" class="dropnote"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bank-cols">
+    <section class="bank-col">
+      <h2>Projects <span class="dropnote">({{ bank.projects | length }})</span></h2>
+      <div id="bank-projects" class="bank-list">
+        {% for entry in bank.projects %}
+        {% include "partials/bank_entry.html" %}
+        {% endfor %}
+      </div>
+      {% if not bank.projects %}<p class="dropnote bank-empty-projects">No projects yet.</p>{% endif %}
+    </section>
+
+    <section class="bank-col">
+      <h2>Experiences <span class="dropnote">({{ bank.experiences | length }})</span></h2>
+      <div id="bank-experiences" class="bank-list">
+        {% for entry in bank.experiences %}
+        {% include "partials/bank_entry.html" %}
+        {% endfor %}
+      </div>
+      {% if not bank.experiences %}<p class="dropnote bank-empty-experiences">No experiences yet.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="bank-data" type="application/json">{{ bank | tojson }}</script>
+<script src="/static/bank.js"></script>
+{% endblock %}

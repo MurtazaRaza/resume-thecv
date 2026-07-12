@@ -256,6 +256,7 @@
       accepted.clear();
       status.textContent = "";
       renderSuggestions(data);
+      renderBankSuggestions(data.bank_suggestions || []);
       refreshPreview();  // cleared any prior acceptances
     } catch (e) {
       status.textContent = "";
@@ -292,6 +293,42 @@
         " rewrite call(s) failed and were skipped.</p>";
     }
   }
+
+  // deterministic bank matches — projects/experiences that cover still-missing
+  // keywords. Insert is suggest-and-approve: the click appends to the CV.
+  function renderBankSuggestions(items) {
+    const block = $("#bank-suggest-block");
+    const box = $("#bank-suggestions");
+    if (!items.length) { block.hidden = true; box.innerHTML = ""; return; }
+    block.hidden = false;
+    box.innerHTML = items.map((s) =>
+      '<div class="bank-sug-card" data-id="' + escapeHtml(s.id) + '">' +
+      '<div class="bank-sug-head"><strong>' + escapeHtml(s.title) + "</strong>" +
+      (s.subtitle ? '<span class="dropnote">' + escapeHtml(s.subtitle) + "</span>" : "") +
+      '<button type="button" class="btn btn-sm bank-sug-insert">↑ Insert into CV</button></div>' +
+      '<div class="bank-sug-matched">covers: ' +
+      s.matched.map((m) => '<span class="chip miss">' + escapeHtml(m) + "</span>").join("") + "</div>" +
+      (s.bullets && s.bullets.length
+        ? '<ul class="bank-bullets">' + s.bullets.map((b) => "<li>" + escapeHtml(b) + "</li>").join("") + "</ul>"
+        : "") +
+      "</div>").join("");
+  }
+
+  $("#bank-suggestions").addEventListener("click", async (e) => {
+    const btn = e.target.closest(".bank-sug-insert");
+    if (!btn) return;
+    const card = e.target.closest(".bank-sug-card");
+    btn.disabled = true;
+    try {
+      await post("/api/bank/insert", { id: card.dataset.id });
+      btn.textContent = "✓ Inserted";
+      toast("Inserted into your CV — re-run “Extract & match” to re-score.", false);
+      refreshPreview();
+    } catch (err) {
+      btn.disabled = false;
+      toast("Insert failed: " + err.message, true);
+    }
+  });
 
   $("#suggestions").addEventListener("click", (e) => {
     const card = e.target.closest(".sug-card");

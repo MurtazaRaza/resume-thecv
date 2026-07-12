@@ -139,12 +139,12 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
-def save_letter(body: str, company: str) -> Path:
-    """Persist the edited letter text as Markdown in data/letters/, returning the
-    path (the .pdf sits beside it after export)."""
+def save_letter(body: str, company: str, letters_dir: Path) -> Path:
+    """Persist the edited letter text as Markdown in the profile's letters/,
+    returning the path (the .pdf sits beside it after export)."""
     slug = _slug(company) or "letter"
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    config.LETTERS_DIR.mkdir(parents=True, exist_ok=True)
-    path = config.LETTERS_DIR / f"letter-{slug}-{stamp}.md"
+    letters_dir.mkdir(parents=True, exist_ok=True)
+    path = letters_dir / f"letter-{slug}-{stamp}.md"
     path.write_text(body.rstrip() + "\n")
     return path

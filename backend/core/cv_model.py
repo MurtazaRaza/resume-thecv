@@ -134,8 +134,7 @@ def normalize(data: Any) -> Dict[str, Any]:
     return cv
 
 
-def load_cv(path: Optional[Path] = None) -> Dict[str, Any]:
-    path = path or config.CV_PATH
+def load_cv(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return empty_cv()
     with open(path) as f:
@@ -146,10 +145,9 @@ def dump_yaml(cv: Dict[str, Any]) -> str:
     return yaml.safe_dump(cv, sort_keys=False, allow_unicode=True, width=100)
 
 
-def save_cv(cv: Dict[str, Any], path: Optional[Path] = None) -> Dict[str, Any]:
+def save_cv(cv: Dict[str, Any], path: Path) -> Dict[str, Any]:
     """Normalize (assigning ids to new bullets) and write to disk."""
     cv = normalize(cv)
-    path = path or config.CV_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         f.write(dump_yaml(cv))

@@ -270,11 +270,11 @@ def apply_tailoring(cv: Dict[str, Any], extraction: Dict[str, Any],
     return cv
 
 
-def save_snapshot(cv: Dict[str, Any], company: str) -> Path:
+def save_snapshot(cv: Dict[str, Any], company: str, versions_dir: Path) -> Path:
     slug = re.sub(r"[^a-z0-9]+", "-", company.lower()).strip("-") or "job"
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    path = config.VERSIONS_DIR / f"tailored-{slug}-{stamp}.yaml"
-    config.VERSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    path = versions_dir / f"tailored-{slug}-{stamp}.yaml"
+    versions_dir.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         f.write(cv_model.dump_yaml(cv))
     return path
