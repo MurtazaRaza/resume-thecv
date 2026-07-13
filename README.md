@@ -19,6 +19,7 @@ Nothing is auto applied without your approval.
 This project is designed for personal, local usage and low friction iteration:
 
 - **Edit with structure**: your CV is stored as structured YAML, then edited through a UI.
+- **Control the layout**: reorder resume sections and set the vertical spacing above each section heading in the PDF, from the editor or directly in YAML.
 - **Render reliably**: generate an ATS friendly PDF plus a plain text export from the same source data.
 - **Improve quality**: run deterministic checks and optional LLM assisted wording improvements.
 - **Tailor by role**: extract requirements from a job description, compare them with your current CV, and accept or reject targeted suggestions.
@@ -197,6 +198,14 @@ No changes are needed in feature code (`tailor.py`, `optimizer.py`, etc.) as lon
 4. **Optimize** selected bullets if you want suggested rewrites
 5. **Tailor** to a specific job description and approve only what is truthful and useful
 6. **Render** to PDF and plain text output
+
+## Section Order And Spacing
+
+The order sections appear in, and the spacing above each one, is configurable per CV:
+
+- In the editor's **Form** tab, the **Section order & spacing** panel (below Certifications) lets you move sections up or down and set the space, in points, above each section heading.
+- The same settings can be edited directly in the **YAML** tab via `section_order` (a list of section keys) and `section_spacing` (a `key: points` map; only values that differ from the default are stored).
+- Empty sections are skipped automatically, and the spacing controls affect the PDF only — the plain text export uses fixed spacing.
 
 ## Main Routes
 
