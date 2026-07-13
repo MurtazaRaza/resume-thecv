@@ -342,28 +342,46 @@ async def tailor_preview(request: Request,
             "tailored_yaml": cv_model.dump_yaml(tailored)}
 
 
-@app.post("/api/tailor/extract")
-async def tailor_extract(request: Request,
-                         profile: Profile = Depends(current_profile)):
-    data = await request.json()
+# fit-score bands (SPEC quick-capture §2): advisory, never gates.
+def _band(coverage: int) -> str:
+    return "strong" if coverage >= 70 else "partial" if coverage >= 40 else "longshot"
+
+
+def _resolve_capture_target(profile: Profile, data):
+    """Shared front half of extract/capture: validate the JD, then resolve or
+    create the tracker row the extraction attaches to. The row is created
+    *before* any model call so a save is never lost to an LLM failure. Returns
+    (app_id, company, error_response); on error the first two are None."""
     jd_text = (data.get("jd_text") or "").strip()
     if not jd_text:
-        return JSONResponse({"error": "Paste the job description first"},
-                            status_code=422)
+        return None, None, JSONResponse({"error": "Paste the job description first"},
+                                        status_code=422)
     app_id = data.get("application_id")
     if app_id:
         entry = tracker.get_application(profile.tracker_db, int(app_id))
         if entry is None:
-            return JSONResponse({"error": "Application not found"}, status_code=404)
-        company = entry["company"]
-    else:
-        company = (data.get("company") or "").strip()
-        role = (data.get("role") or "").strip()
-        if not company or not role:
-            return JSONResponse({"error": "Company and role are required for a "
-                                          "new application"}, status_code=422)
-        app_id = tracker.create_application(profile.tracker_db, company, role,
-                                            (data.get("url") or "").strip())
+            return None, None, JSONResponse({"error": "Application not found"},
+                                            status_code=404)
+        return int(app_id), entry["company"], None
+    company = (data.get("company") or "").strip()
+    role = (data.get("role") or "").strip()
+    if not company or not role:
+        return None, None, JSONResponse(
+            {"error": "Company and role are required for a new application"},
+            status_code=422)
+    app_id = tracker.create_application(profile.tracker_db, company, role,
+                                        (data.get("url") or "").strip())
+    return app_id, company, None
+
+
+@app.post("/api/tailor/extract")
+async def tailor_extract(request: Request,
+                         profile: Profile = Depends(current_profile)):
+    data = await request.json()
+    app_id, company, err = _resolve_capture_target(profile, data)
+    if err:
+        return err
+    jd_text = data["jd_text"].strip()
     try:
         extraction = tailor.extract(jd_text, get_provider("jd_extract"))
     except LLMError as e:
@@ -375,6 +393,52 @@ async def tailor_extract(request: Request,
             "extraction": extraction, "match": tailor.match(cv, extraction),
             "current_title": cv["basics"]["title"],
             "skill_groups": [g["group"] for g in cv["skills"] if g["group"]]}
+
+
+@app.post("/api/capture")
+async def capture(request: Request,
+                  profile: Profile = Depends(current_profile)):
+    """Quick Capture & Instant Fit Check (docs/features/quick-capture-fit-check).
+    Saves a job to the tracker and, in the same action, returns a fit verdict:
+    coverage band, top missing must-haves, and a deterministic effort hint.
+    Only steps 1-2 of the tailor pipeline run (one LLM extract + pure-Python
+    match) — the per-bullet rewrites are the one-click-away next action, not
+    done here. The row is persisted before the model call so a failed extract
+    leaves a captured job to retry, never nothing."""
+    data = await request.json()
+    app_id, company, err = _resolve_capture_target(profile, data)
+    if err:
+        return err
+    jd_text = data["jd_text"].strip()
+    try:
+        extraction = tailor.extract(jd_text, get_provider("jd_extract"))
+    except LLMError as e:
+        # the row already exists — return it so the client keeps the app id
+        return JSONResponse({"error": str(e), "application_id": app_id},
+                            status_code=502)
+
+    cv = cv_model.load_cv(profile.cv_path)
+    m = tailor.match(cv, extraction)
+    coverage = m["coverage"]
+    band = _band(coverage)
+
+    # top missing: must-have qualifications first, then the rest, capped at 3
+    must = {q.lower() for q in extraction.get("must_have_qualifications", [])}
+    ordered = sorted(m["missing"], key=lambda kw: kw.lower() not in must)
+    top_missing = ordered[:3]
+
+    tailorable = tailor.count_tailorable(cv, extraction, jd_text)
+    next_action = {"strong": "Tailor & apply",
+                   "partial": "Review suggestions"}.get(band, "Decide: apply or skip")
+
+    tracker.update_application(
+        profile.tracker_db, app_id, jd_text=jd_text,
+        jd_extraction=json.dumps(extraction), match_score=coverage,
+        next_action=next_action)
+
+    return {"application_id": app_id, "company": company, "coverage": coverage,
+            "band": band, "top_missing": top_missing,
+            "tailorable_count": tailorable, "next_action": next_action}
 
 
 @app.post("/api/tailor/suggest")

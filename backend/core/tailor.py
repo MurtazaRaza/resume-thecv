@@ -170,17 +170,13 @@ def _context_words(jd_text: str, kw: str) -> Set[str]:
     return words
 
 
-def suggest(cv: Dict[str, Any], extraction: Dict[str, Any], jd_text: str,
-            provider: LLMProvider, guidance: str = "") -> Dict[str, Any]:
-    """Missing-keyword rewrite suggestions (SPEC §5.1 step 3). Word-overlap
-    heuristic picks (bullet, keyword) pairs, max MAX_REWRITE_CALLS sequential
-    LLM calls, one suggestion per bullet. A failed call skips that pair
-    instead of losing the whole run.
-
-    `guidance` is optional free-text steering from the user (tone, emphasis).
-    It is appended to each per-bullet request but never overrides the honesty
-    rules in the system prompt."""
-    guidance = guidance.strip()
+def _pick_rewrite_targets(cv: Dict[str, Any], extraction: Dict[str, Any],
+                          jd_text: str) -> List[tuple]:
+    """The deterministic (bullet, missing-keyword) selection shared by
+    `suggest` (which then rewrites each) and `count_tailorable` (which just
+    counts them). Word-overlap heuristic, capped at MAX_REWRITE_CALLS, one
+    pick per bullet and at most MAX_BULLETS_PER_KEYWORD per keyword. No LLM.
+    Returns a list of (keyword, entry, bullet) in priority order."""
     missing = match(cv, extraction)["missing"]
     bullets = [(e, b) for e in cv["experience"] for b in e["bullets"]
                if b["text"].strip()]
@@ -203,6 +199,30 @@ def suggest(cv: Dict[str, Any], extraction: Dict[str, Any], jd_text: str,
         picked.append((kw, e, b))
         if len(picked) >= MAX_REWRITE_CALLS:
             break
+    return picked
+
+
+def count_tailorable(cv: Dict[str, Any], extraction: Dict[str, Any],
+                     jd_text: str) -> int:
+    """How many distinct experience bullets the rewrite step *would* target,
+    without running any LLM call (SPEC quick-capture effort hint). Shares
+    `_pick_rewrite_targets` with `suggest` so the count can never drift from
+    what tailoring would actually attempt."""
+    return len(_pick_rewrite_targets(cv, extraction, jd_text))
+
+
+def suggest(cv: Dict[str, Any], extraction: Dict[str, Any], jd_text: str,
+            provider: LLMProvider, guidance: str = "") -> Dict[str, Any]:
+    """Missing-keyword rewrite suggestions (SPEC §5.1 step 3). Word-overlap
+    heuristic picks (bullet, keyword) pairs, max MAX_REWRITE_CALLS sequential
+    LLM calls, one suggestion per bullet. A failed call skips that pair
+    instead of losing the whole run.
+
+    `guidance` is optional free-text steering from the user (tone, emphasis).
+    It is appended to each per-bullet request but never overrides the honesty
+    rules in the system prompt."""
+    guidance = guidance.strip()
+    picked = _pick_rewrite_targets(cv, extraction, jd_text)
 
     suggestions, errors = [], []
     for kw, e, b in picked:

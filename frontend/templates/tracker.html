@@ -4,6 +4,45 @@
 {% block content %}
 <div class="tracker-wrap">
 
+  <!-- Quick Capture & Instant Fit Check: the primary front door. Paste a JD,
+       get a fit verdict, and save the job to the tracker in one action. -->
+  <div class="pane capture-pane">
+    <div class="pane-body">
+      <div class="capture-head">
+        <h2>Save a job</h2>
+        <span class="dropnote">Paste a job description for an instant fit check.</span>
+      </div>
+      <div class="row">
+        <label>Company<input type="text" id="cap-company" placeholder="Acme Corp"></label>
+        <label>Role<input type="text" id="cap-role" placeholder="Backend Engineer"></label>
+        <label>Job URL (optional)<input type="text" id="cap-url" placeholder="https://…"></label>
+      </div>
+      <label class="jd-label">Job description<textarea id="cap-jd" rows="6"
+        placeholder="Paste the full job description here…"></textarea></label>
+      <div class="actionbar">
+        <button type="button" class="btn btn-primary" id="cap-submit">Save &amp; check fit</button>
+        <span id="cap-status" class="dropnote"></span>
+      </div>
+
+      <!-- verdict card, rendered in place after submit -->
+      <div class="verdict-card" id="verdict-card" hidden>
+        <div class="verdict-top">
+          <div class="verdict-score">
+            <span class="match-pill" id="verdict-pill"></span>
+            <span class="verdict-band" id="verdict-band"></span>
+          </div>
+          <div class="coverage-bar"><div class="coverage-fill" id="verdict-fill"></div></div>
+        </div>
+        <div class="verdict-missing" id="verdict-missing"></div>
+        <div class="verdict-effort dropnote" id="verdict-effort"></div>
+        <div class="actionbar">
+          <a class="btn btn-primary" id="verdict-action" href="#"></a>
+          <a class="btn" id="verdict-open" href="#">Open in tracker</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="tracker-head">
     <h1>Applications <span class="dropnote">({{ dashboard.total }})</span></h1>
     <button type="button" class="btn btn-primary" id="new-app-btn">+ New application</button>

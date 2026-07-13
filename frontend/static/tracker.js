@@ -60,4 +60,72 @@
       btn.disabled = false;
     }
   });
+
+  // ---- Quick Capture & Instant Fit Check -------------------------------------
+  const BANDS = {
+    strong: { pill: "good", label: "Strong fit" },
+    partial: { pill: "mid", label: "Partial fit" },
+    longshot: { pill: "low", label: "Long shot" },
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderVerdict(data) {
+    const band = BANDS[data.band] || BANDS.longshot;
+    const card = $("#verdict-card");
+
+    const pill = $("#verdict-pill");
+    pill.textContent = data.coverage + "%";
+    pill.className = "match-pill " + band.pill;
+    $("#verdict-band").textContent = band.label;
+
+    const fill = $("#verdict-fill");
+    fill.style.width = data.coverage + "%";
+    fill.className = "coverage-fill " + band.pill;
+
+    const missing = data.top_missing || [];
+    $("#verdict-missing").innerHTML = missing.length
+      ? '<span class="dropnote">Top missing must-haves:</span> ' +
+        missing.map((m) => '<span class="chip miss">' + escapeHtml(m) + "</span>").join("")
+      : '<span class="dropnote">No must-haves missing from your CV.</span>';
+
+    const n = data.tailorable_count;
+    $("#verdict-effort").textContent = n
+      ? "~" + n + " bullet" + (n === 1 ? "" : "s") + " could be tailored to close the gap."
+      : "No bullets obviously relate to the missing keywords.";
+
+    const action = $("#verdict-action");
+    action.textContent = data.next_action;
+    action.href = "/tailor?app=" + data.application_id;
+    $("#verdict-open").href = "/tracker/" + data.application_id;
+
+    card.hidden = false;
+    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  $("#cap-submit").addEventListener("click", async () => {
+    const company = $("#cap-company").value.trim();
+    const role = $("#cap-role").value.trim();
+    const jd = $("#cap-jd").value.trim();
+    if (!company || !role) { toast("Company and role are required", true); return; }
+    if (!jd) { toast("Paste the job description first", true); return; }
+    const btn = $("#cap-submit");
+    btn.disabled = true;
+    $("#cap-status").textContent = "Saving & checking fit…";
+    try {
+      const data = await post("/api/capture", {
+        company, role, url: $("#cap-url").value.trim(), jd_text: jd,
+      });
+      $("#cap-status").textContent = "";
+      renderVerdict(data);
+    } catch (e) {
+      // the save survives an LLM failure; the app row already exists
+      $("#cap-status").textContent = "Saved, but fit check failed: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
 })();
