@@ -162,6 +162,24 @@ textarea.yaml {
 .bullet-row textarea { min-height: 34px; }
 .bullet-row .drag { color: var(--muted); cursor: default; padding-top: 9px; }
 
+/* --- section order --- */
+.order-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.order-item {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 10px; margin-bottom: 6px; background: var(--entry-bg);
+}
+.order-label { font-weight: 500; flex: 1; }
+.order-space {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--muted); font-size: 12px; margin-right: 6px;
+}
+.order-space input { width: 52px; text-align: right; }
+.order-ctrls { display: flex; gap: 2px; }
+.order-ctrls .btn-ghost:hover { color: var(--accent); }
+.order-item:first-child .order-up,
+.order-item:last-child .order-down { visibility: hidden; }
+
 /* --- buttons --- */
 button { font: inherit; cursor: pointer; }
 .btn {

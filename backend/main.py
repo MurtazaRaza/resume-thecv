@@ -125,7 +125,11 @@ def home(profile: Profile = Depends(current_profile)):
 def editor(request: Request, profile: Profile = Depends(current_profile)):
     cv = cv_model.load_cv(profile.cv_path)
     return templates.TemplateResponse("editor.html", page_ctx(
-        request, profile, cv=cv, cv_yaml=cv_model.dump_yaml(cv)))
+        request, profile, cv=cv, cv_yaml=cv_model.dump_yaml(cv),
+        section_labels=cv_model.SECTION_LABELS,
+        spacing_default=cv_model.DEFAULT_SECTION_SPACING,
+        spacing_min=cv_model.MIN_SECTION_SPACING,
+        spacing_max=cv_model.MAX_SECTION_SPACING))
 
 
 @app.get("/import")

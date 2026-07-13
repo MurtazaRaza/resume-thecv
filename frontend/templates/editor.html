@@ -157,6 +157,26 @@
         <div id="cert-list">{% for c in cv.certifications %}{{ cert_entry(c) }}{% endfor %}</div>
         <button type="button" class="btn btn-add" data-add="cert">+ add certification</button>
       </fieldset>
+
+      <fieldset class="section" id="sec-layout">
+        <legend>Section order &amp; spacing</legend>
+        <p class="dropnote">Order the sections appear in the PDF and ATS export, and set the space (in points) above each section's heading in the PDF. Empty sections are skipped automatically.</p>
+        <ul id="order-list" class="order-list">
+          {% for key in cv.section_order %}
+          <li class="order-item" data-key="{{ key }}">
+            <span class="order-label">{{ section_labels[key] }}</span>
+            <label class="order-space" title="Space above this section (points)">
+              <input type="number" data-f="spacing" min="{{ spacing_min }}" max="{{ spacing_max }}"
+                     step="1" value="{{ cv.section_spacing.get(key, spacing_default) }}"> pt
+            </label>
+            <span class="order-ctrls">
+              <button type="button" class="btn-ghost order-up" title="Move up">↑</button>
+              <button type="button" class="btn-ghost order-down" title="Move down">↓</button>
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+      </fieldset>
     </div>
 
     <div class="pane-body" id="tab-yaml" hidden>

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend import config
+from backend.core import cv_model
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -121,50 +122,66 @@ def render_txt(cv: Dict[str, Any], out_dir: Path, out_name: str = "cv") -> Path:
     if d["contact_line"]:
         lines.append(d["contact_line"].replace("  |  ", " | "))
 
-    if d["summary"]:
-        header("Summary")
-        lines.append(d["summary"])
+    def sec_summary():
+        if d["summary"]:
+            header("Summary")
+            lines.append(d["summary"])
 
-    if d["experience"]:
-        header("Experience")
-        for e in d["experience"]:
-            role = ", ".join(x for x in (e["title"], e["company"]) if x)
-            if e["location"]:
-                role += f" — {e['location']}"
-            lines.append(f"{role} ({e['dates']})" if e["dates"] else role)
-            lines.extend(f"* {b['text']}" for b in e["bullets"])
-            lines.append("")
-        lines.pop()
+    def sec_experience():
+        if d["experience"]:
+            header("Experience")
+            for e in d["experience"]:
+                role = ", ".join(x for x in (e["title"], e["company"]) if x)
+                if e["location"]:
+                    role += f" — {e['location']}"
+                lines.append(f"{role} ({e['dates']})" if e["dates"] else role)
+                lines.extend(f"* {b['text']}" for b in e["bullets"])
+                lines.append("")
+            lines.pop()
 
-    if d["education"]:
-        header("Education")
-        for e in d["education"]:
-            row = ", ".join(x for x in (e["degree"], e["institution"]) if x)
-            if e["dates"]:
-                row += f" ({e['dates']})"
-            lines.append(row)
-            if e["details"]:
-                lines.append(f"  {e['details']}")
+    def sec_education():
+        if d["education"]:
+            header("Education")
+            for e in d["education"]:
+                row = ", ".join(x for x in (e["degree"], e["institution"]) if x)
+                if e["dates"]:
+                    row += f" ({e['dates']})"
+                lines.append(row)
+                if e["details"]:
+                    lines.append(f"  {e['details']}")
 
-    if d["skills"]:
-        header("Skills")
-        for s in d["skills"]:
-            prefix = f"{s['group']}: " if s["group"] else ""
-            lines.append(prefix + ", ".join(s["items"]))
+    def sec_skills():
+        if d["skills"]:
+            header("Skills")
+            for s in d["skills"]:
+                prefix = f"{s['group']}: " if s["group"] else ""
+                lines.append(prefix + ", ".join(s["items"]))
 
-    if d["projects"]:
-        header("Projects")
-        for p in d["projects"]:
-            lines.append(p["name"] + (f" — {p['url']}" if p["url"] else ""))
-            lines.extend(f"* {b['text']}" for b in p["bullets"])
+    def sec_projects():
+        if d["projects"]:
+            header("Projects")
+            for p in d["projects"]:
+                lines.append(p["name"] + (f" — {p['url']}" if p["url"] else ""))
+                lines.extend(f"* {b['text']}" for b in p["bullets"])
 
-    if d["certifications"]:
-        header("Certifications")
-        for c in d["certifications"]:
-            row = ", ".join(x for x in (c["name"], c["issuer"]) if x)
-            if c["date"]:
-                row += f" ({c['date']})"
-            lines.append(row)
+    def sec_certifications():
+        if d["certifications"]:
+            header("Certifications")
+            for c in d["certifications"]:
+                row = ", ".join(x for x in (c["name"], c["issuer"]) if x)
+                if c["date"]:
+                    row += f" ({c['date']})"
+                lines.append(row)
+
+    renderers = {
+        "summary": sec_summary, "experience": sec_experience,
+        "education": sec_education, "skills": sec_skills,
+        "projects": sec_projects, "certifications": sec_certifications,
+    }
+    for name in d.get("section_order") or cv_model.ORDERABLE_SECTIONS:
+        r = renderers.get(name)
+        if r:
+            r()
 
     out_dir.mkdir(parents=True, exist_ok=True)
     txt_path = out_dir / f"{out_name}.txt"

@@ -65,6 +65,12 @@
       certifications: $$("#cert-list > .entry").map((e) => ({
         name: fval(e, "name"), issuer: fval(e, "issuer"), date: fval(e, "date"),
       })).filter((c) => c.name),
+      section_order: $$("#order-list > .order-item").map((li) => li.dataset.key),
+      section_spacing: $$("#order-list > .order-item").reduce((acc, li) => {
+        const v = field(li, "spacing");
+        if (v && v.value !== "") acc[li.dataset.key] = Number(v.value);
+        return acc;
+      }, {}),
     };
   }
 
@@ -190,6 +196,12 @@
       t.closest(".bullet-row").remove();
     } else if (t.classList.contains("rm-entry")) {
       t.closest(".entry").remove();
+    } else if (t.classList.contains("order-up")) {
+      const li = t.closest(".order-item");
+      if (li.previousElementSibling) li.parentNode.insertBefore(li, li.previousElementSibling);
+    } else if (t.classList.contains("order-down")) {
+      const li = t.closest(".order-item");
+      if (li.nextElementSibling) li.parentNode.insertBefore(li.nextElementSibling, li);
     }
   });
 

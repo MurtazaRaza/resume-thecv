@@ -16,6 +16,23 @@ from backend import config
 SECTION_KEYS = ["basics", "summary", "experience", "education", "skills",
                 "projects", "certifications"]
 
+# Sections whose order in the rendered PDF/txt is user-configurable. `basics`
+# is excluded: it's always the header at the top of the document.
+ORDERABLE_SECTIONS = ["summary", "experience", "education", "skills",
+                      "projects", "certifications"]
+
+# Display labels for the reorder UI.
+SECTION_LABELS = {
+    "summary": "Summary", "experience": "Experience", "education": "Education",
+    "skills": "Skills", "projects": "Projects", "certifications": "Certifications",
+}
+
+# Space (in points) above a section's header. The default matches the template's
+# built-in gap; users override per section to tighten or loosen the layout.
+DEFAULT_SECTION_SPACING = 12
+MIN_SECTION_SPACING = 0
+MAX_SECTION_SPACING = 60
+
 
 def empty_cv() -> Dict[str, Any]:
     return {
@@ -27,7 +44,42 @@ def empty_cv() -> Dict[str, Any]:
         "skills": [],
         "projects": [],
         "certifications": [],
+        "section_order": list(ORDERABLE_SECTIONS),
+        "section_spacing": {},
     }
+
+
+def normalize_section_order(raw: Any) -> List[str]:
+    """Return a valid render order: known sections, de-duplicated, with any
+    missing ones appended in default order so every section still renders."""
+    order: List[str] = []
+    for s in raw or []:
+        s = _str(s).strip()
+        if s in ORDERABLE_SECTIONS and s not in order:
+            order.append(s)
+    for s in ORDERABLE_SECTIONS:
+        if s not in order:
+            order.append(s)
+    return order
+
+
+def normalize_section_spacing(raw: Any) -> Dict[str, int]:
+    """Keep only known sections whose spacing differs from the default, clamped
+    to a sane range. Storing only overrides keeps the YAML clean."""
+    spacing: Dict[str, int] = {}
+    if not isinstance(raw, dict):
+        return spacing
+    for key, val in raw.items():
+        if key not in ORDERABLE_SECTIONS:
+            continue
+        try:
+            pts = int(round(float(val)))
+        except (TypeError, ValueError):
+            continue
+        pts = max(MIN_SECTION_SPACING, min(MAX_SECTION_SPACING, pts))
+        if pts != DEFAULT_SECTION_SPACING:
+            spacing[key] = pts
+    return spacing
 
 
 def _new_id(taken: Set[str]) -> str:
@@ -130,6 +182,9 @@ def normalize(data: Any) -> Dict[str, Any]:
                 "issuer": _str(c.get("issuer")).strip(),
                 "date": _str(c.get("date")).strip()[:7],
             })
+
+    cv["section_order"] = normalize_section_order(data.get("section_order"))
+    cv["section_spacing"] = normalize_section_spacing(data.get("section_spacing"))
 
     return cv
 
