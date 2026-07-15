@@ -147,10 +147,12 @@ input[type="text"], textarea {
   font: inherit; color: var(--text); background: var(--input-bg);
 }
 input:focus, textarea:focus { outline: 2px solid var(--focus-ring); border-color: var(--accent); }
-textarea { resize: vertical; }
+/* Height is driven by autogrow.js, so the drag handle would only fight it. */
+textarea { resize: none; overflow-y: hidden; }
 textarea.yaml {
   font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px;
   min-height: calc(100vh - 240px); white-space: pre;
+  resize: vertical; overflow-y: auto;
 }
 
 .entry {

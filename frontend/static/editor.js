@@ -205,14 +205,6 @@
     }
   });
 
-  // auto-grow bullet textareas
-  document.addEventListener("input", (e) => {
-    if (e.target.matches(".bullet-row textarea")) {
-      e.target.style.height = "auto";
-      e.target.style.height = e.target.scrollHeight + "px";
-    }
-  });
-
   // ---- analyzer (Checks tab) --------------------------------------------------
   const CAT_ORDER = { error: 0, warn: 1, info: 2 };
   let analysisSeq = 0;
