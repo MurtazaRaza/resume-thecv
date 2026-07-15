@@ -1,14 +1,16 @@
-{# One bank entry card. `entry` is a project (has .name) or experience (.company). #}
-<div class="bank-entry" data-id="{{ entry.id }}"
-     data-kind="{% if entry.company is defined %}experiences{% else %}projects{% endif %}">
+{# One bank entry card. `kind` is passed by the caller: both kinds now carry a
+   .company, so the entry's shape alone can't tell them apart. #}
+<div class="bank-entry" data-id="{{ entry.id }}" data-kind="{{ kind }}">
   <div class="bank-entry-head">
     <div class="bank-entry-title">
-      {% if entry.company is defined %}
+      {% if kind == "experiences" %}
         <strong>{{ entry.title or "—" }}</strong>
         <span class="dropnote">{{ entry.company }}{% if entry.start %} · {{ entry.start }}–{{ entry.end or "present" }}{% endif %}</span>
       {% else %}
         <strong>{{ entry.name or "—" }}</strong>
         {% if entry.url %}<a class="dropnote" href="{{ entry.url }}" target="_blank" rel="noopener">{{ entry.url }}</a>{% endif %}
+        {% set org = [entry.company, entry.title] | select | join(" — ") %}
+        {% if org %}<span class="dropnote">{{ org }}</span>{% endif %}
       {% endif %}
     </div>
     <div class="bank-entry-actions">

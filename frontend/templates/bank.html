@@ -30,7 +30,11 @@
       <div class="row" id="ef-project-fields">
         <label>Name<input type="text" id="ef-name" placeholder="Analytics Dashboard"></label>
         <label>URL (optional)<input type="text" id="ef-url" placeholder="https://…"></label>
+        <label>Company (optional)<input type="text" id="ef-p-company" placeholder="Acme Corp / Personal"></label>
+        <label>Designation (optional)<input type="text" id="ef-p-title" placeholder="Backend Engineer"></label>
       </div>
+      <p class="dropnote" id="ef-project-org-note">Where this project was done. Kept in
+        the bank for your own reference — it never appears on the CV.</p>
       <div class="row" id="ef-experience-fields" hidden>
         <label>Company<input type="text" id="ef-company" placeholder="Acme Corp"></label>
         <label>Title<input type="text" id="ef-title" placeholder="Backend Engineer"></label>
@@ -60,7 +64,9 @@
       <h2>Projects <span class="dropnote">({{ bank.projects | length }})</span></h2>
       <div id="bank-projects" class="bank-list">
         {% for entry in bank.projects %}
+        {% with kind = "projects" %}
         {% include "partials/bank_entry.html" %}
+        {% endwith %}
         {% endfor %}
       </div>
       {% if not bank.projects %}<p class="dropnote bank-empty-projects">No projects yet.</p>{% endif %}
@@ -70,7 +76,9 @@
       <h2>Experiences <span class="dropnote">({{ bank.experiences | length }})</span></h2>
       <div id="bank-experiences" class="bank-list">
         {% for entry in bank.experiences %}
+        {% with kind = "experiences" %}
         {% include "partials/bank_entry.html" %}
+        {% endwith %}
         {% endfor %}
       </div>
       {% if not bank.experiences %}<p class="dropnote bank-empty-experiences">No experiences yet.</p>{% endif %}

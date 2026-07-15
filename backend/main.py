@@ -690,8 +690,7 @@ async def update_bank_entry(entry_id: str, request: Request,
     if not isinstance(entry, dict):
         return JSONResponse({"error": "entry must be an object"}, status_code=422)
     entry["id"] = entry_id
-    kind = "experiences" if "company" in existing else "projects"
-    saved = bank.upsert_entry(profile.bank_path, kind, entry)
+    saved = bank.upsert_entry(profile.bank_path, bank.kind_of(b, entry_id), entry)
     return saved
 
 
@@ -730,13 +729,14 @@ async def bank_insert(request: Request,
         return JSONResponse({"error": "Bank entry not found"}, status_code=404)
     cv = cv_model.load_cv(profile.cv_path)
     bullets = [{"text": bl["text"]} for bl in entry.get("bullets") or []]
-    if "company" in entry:
+    if bank.kind_of(b, entry_id) == "experiences":
         cv["experience"].append({
             "company": entry["company"], "title": entry["title"],
             "location": entry.get("location", ""),
             "start": entry.get("start", ""), "end": entry.get("end"),
             "bullets": bullets})
     else:
+        # a project's company/title are bank-only reference, never rendered
         cv["projects"].append({
             "name": entry["name"], "url": entry.get("url", ""), "bullets": bullets})
     cv_model.save_cv(cv, profile.cv_path)

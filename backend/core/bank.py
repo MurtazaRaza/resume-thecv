@@ -48,7 +48,12 @@ def _norm_tags(raw: Any) -> List[str]:
 
 def normalize(data: Any) -> Dict[str, List[Any]]:
     """Coerce arbitrary YAML into the full bank schema; assign missing ids.
-    Ids are unique across BOTH lists so a bank entry id is globally addressable."""
+    Ids are unique across BOTH lists so a bank entry id is globally addressable.
+
+    A project records its own `company`/`title` as free text. Projects and
+    experiences are independent records — neither points at the other, and a
+    project's company/title never reach the CV; they're for your own reference.
+    """
     if not isinstance(data, dict):
         data = {}
     bank = empty_bank()
@@ -68,6 +73,8 @@ def normalize(data: Any) -> Dict[str, List[Any]]:
             "id": eid,
             "name": _str(p.get("name")).strip(),
             "url": _str(p.get("url")).strip(),
+            "company": _str(p.get("company")).strip(),
+            "title": _str(p.get("title")).strip(),
             "tags": _norm_tags(p.get("tags")),
             "bullets": cv_model._norm_bullets(p.get("bullets"), taken),
         })
@@ -118,8 +125,13 @@ def find_entry(bank: Dict[str, Any], entry_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _kind_of(entry: Dict[str, Any]) -> str:
-    return "experiences" if "company" in entry else "projects"
+def kind_of(bank: Dict[str, Any], entry_id: str) -> Optional[str]:
+    """Which list an id lives in. Authoritative: projects carry a `company` of
+    their own, so an entry's shape can't tell the two kinds apart."""
+    for kind in ENTRY_KINDS:
+        if any(e["id"] == entry_id for e in bank[kind]):
+            return kind
+    return None
 
 
 def upsert_entry(path: Path, kind: str, entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -130,13 +142,11 @@ def upsert_entry(path: Path, kind: str, entry: Dict[str, Any]) -> Dict[str, Any]
     bank = load_bank(path)
     entry = dict(entry)
     eid = _str(entry.get("id")).strip()
-    if eid:
-        existing = find_entry(bank, eid)
-        if existing is not None:
-            target = bank[_kind_of(existing)]
-            bank[_kind_of(existing)] = [entry if e["id"] == eid else e for e in target]
-        else:
-            bank[kind].append(entry)
+    existing_kind = kind_of(bank, eid) if eid else None
+    if existing_kind is not None:
+        # an entry never changes kind: update it in the list it already lives in
+        bank[existing_kind] = [entry if e["id"] == eid else e
+                               for e in bank[existing_kind]]
     else:
         bank[kind].append(entry)
     return save_bank(bank, path)

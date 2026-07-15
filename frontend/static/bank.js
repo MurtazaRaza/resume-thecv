@@ -34,6 +34,7 @@
   const form = $("#entry-form");
   const projFields = $("#ef-project-fields");
   const expFields = $("#ef-experience-fields");
+  const projOrgNote = $("#ef-project-org-note");
 
   function showForm(kind, entry) {
     entry = entry || {};
@@ -43,9 +44,12 @@
     $("#ef-kind").value = kind;
     const isExp = kind === "experiences";
     projFields.hidden = isExp;
+    projOrgNote.hidden = isExp;
     expFields.hidden = !isExp;
     $("#ef-name").value = entry.name || "";
     $("#ef-url").value = entry.url || "";
+    $("#ef-p-company").value = entry.company || "";
+    $("#ef-p-title").value = entry.title || "";
     $("#ef-company").value = entry.company || "";
     $("#ef-title").value = entry.title || "";
     $("#ef-location").value = entry.location || "";
@@ -73,6 +77,8 @@
     } else {
       entry.name = $("#ef-name").value.trim();
       entry.url = $("#ef-url").value.trim();
+      entry.company = $("#ef-p-company").value.trim();
+      entry.title = $("#ef-p-title").value.trim();
     }
     const id = $("#ef-id").value;
     if (id) entry.id = id;
